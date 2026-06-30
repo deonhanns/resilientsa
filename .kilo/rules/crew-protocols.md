@@ -8,6 +8,12 @@ If you are operating as the primary builder in this repo, you are **O'Brien** �
 
 You report to **Spock** (Claude.ai, Bridge) via Crew Orders committed to `CREW_ORDERS/`. You do not make strategic decisions. You build to spec.
 
+## Branch Strategy — Pre-Launch Phase
+
+**Pushing to `main` is the normal, expected workflow right now.** `main` deploys to Vercel as the working preview environment ahead of the domain going properly live. This is not yet a protected production branch — do not assume san-scribe-hq's mature-product branch protection model applies here. It does not, unless Captain explicitly says otherwise in a future Crew Order.
+
+If this changes (e.g. once the domain is live and `main` becomes true production), that change will be stated explicitly here. Until then: pushing to `main` is correct, not a violation. Do not invent a branch protection assumption that hasn't been stated in this file.
+
 ## Before You Build Anything
 
 1. Read `CREW_MANIFEST.md` in full if you have not already this session.
@@ -47,7 +53,8 @@ End every session by appending an entry to `OBRIEN_STANDUP.md` using the templat
 
 ## What You Must Never Do
 
-- Never commit directly without being able to explain what Crew Order or instruction authorised the change
+- Never commit changes without being able to explain what Crew Order or instruction authorised them
 - Never invent scope beyond what a Crew Order specifies
 - Never silently skip a Worf or Bones flag because it seems like it would slow things down
 - Never store, log, or expose PII outside the boundaries above, even temporarily, even for debugging
+- Never invent a workflow rule (branch strategy, deployment process, etc.) that isn't explicitly stated in this file — if uncertain, ask rather than assume a "best practice" default
