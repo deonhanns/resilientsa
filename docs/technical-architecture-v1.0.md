@@ -204,6 +204,89 @@ ConnectionEvent {
 
 This table is the raw material for the Network Health Metrics in Mission Brief Section 6.1 (Connection Density, Isolate Detection, etc.) — those metrics are **computed views**, not stored state, recalculated on read or via a nightly batch job. Do not build them as columns that need manual updating.
 
+### 3.4a Network Shape Tracking — Phase Classification
+
+Per `docs/june-holley-integration-guide-v1.0.md` Section 4a, network *health* (trust, safety) and network *topology phase* (Scattered Fragments → Hub-and-Spoke → Multi-Hub Small-World → Core/Periphery, per Krebs & Holley) are different axes and must not be conflated. This section specs how phase is tracked.
+
+**Governing principle, restated from the Captain's direction:** the system tracks network shape from the start, on all available data, even when the classification is trivial in early stages. The output of this tracking is intelligence for a human to deliver, per the platform's calm technology principle (Mission Brief Section 2.5) — it is never surfaced to a Cell Steward as a raw graph or a piece of jargon ("your node is Hub-and-Spoke"). It feeds visualisations and plain-language summaries that the Cell Steward or Node Admin sees, and the delivery of insight to the broader community remains human, exactly as every other intelligence output on this platform.
+
+**Data model:**
+
+```
+NetworkPhaseSnapshot {
+  id (uuid, pk)
+  node_id (fk → Node)
+  cell_id (fk → Cell, nullable — phase can be computed at cell or node level)
+  phase (enum: scattered_fragments, hub_and_spoke, multi_hub, core_periphery)
+  computed_at (timestamp)
+  metrics (jsonb — the raw values that produced this classification, see 3.4a.2)
+}
+```
+
+This is an **append-only log, not a single mutable field on `Node` or `Cell`.** Storing it as a time series, not overwriting a single value, is what makes the maturation story tellable later — "your community has grown from Hub-and-Spoke to Multi-Hub over the past eight months" is only possible if history is retained, not discarded each time a new snapshot is computed.
+
+**Computation cadence:** weekly batch job, not real-time. Phase classification is a structural property of the network that changes slowly — there is no need for the cost or complexity of live computation. A new `NetworkPhaseSnapshot` row is written each run; nothing is deleted.
+
+#### 3.4a.1 What's Simple to Compute Now vs. What Needs More Later
+
+Honest staging, consistent with this document's practice of flagging what's deferred rather than pretending everything is equally solved:
+
+**Computable from day one, with simple graph metrics:**
+- **Scattered Fragments vs. Hub-and-Spoke** — distinguishable by degree centralisation alone. If one node (almost always the Cell Steward, early on) accounts for a large majority of all `ConnectionEvent` edges in a cell, that's Hub-and-Spoke. If connections are sparse and clustered into small disconnected groups with no dominant node, that's Scattered Fragments. This is a basic centralisation calculation, well within standard graph libraries (e.g. `networkx`-equivalent in the chosen backend stack), no special infrastructure required.
+
+**Needs more sophistication, flagged honestly as a Phase 2 refinement:**
+- **Multi-Hub Small-World vs. Core/Periphery** — distinguishing these properly requires identifying multiple distinct hubs, measuring the weak-tie bridges between their clusters, and assessing core density versus peripheral porosity (per Krebs & Holley's own definitions, Integration Guide Section 4a.1). This is genuine social network analysis, closer to what Krebs's own InFLOW software was purpose-built for. MVP can produce a reasonable approximate classification using existing graph libraries; a more rigorous implementation is a Phase 2 refinement, not an MVP blocker. The `metrics` jsonb field on `NetworkPhaseSnapshot` exists precisely so the underlying numbers are preserved even if the classification logic improves later — old snapshots don't need to be recomputed, just reinterpreted if the algorithm changes.
+
+#### 3.4a.2 What Gets Stored in `metrics`
+
+To keep the classification auditable and improvable without re-deriving from raw `ConnectionEvent` history each time:
+
+```json
+{
+  "node_count": 24,
+  "edge_count": 31,
+  "degree_centralisation": 0.71,
+  "largest_hub_user_id": "...",
+  "largest_hub_share_of_edges": 0.68,
+  "distinct_cluster_count": 1,
+  "isolate_count": 3
+}
+```
+
+These map directly to the Network Health Metrics already in Mission Brief Section 6.1 — this is not a second, separate metrics system, it is the structural substrate those metrics are computed against.
+
+#### 3.4a.3 Interpretation Rules for Existing Metrics (Closing the Gap from the Integration Guide)
+
+Per Integration Guide Section 4a.2, the existing Hub Identification metric (Mission Brief 6.1) must be interpreted differently depending on phase:
+
+```
+IF cell.current_phase == hub_and_spoke
+  AND hub_user_id == cell.steward_user_id:
+    → Expected and correct. Reciprocity Prompt and Steward Companion
+      mechanics (Mission Brief 6.2) still apply for the Steward's
+      personal wellbeing, but this is NOT surfaced as a network
+      anomaly requiring urgent correction.
+
+IF cell.current_phase IN (multi_hub, core_periphery)
+  AND a single user accounts for > 0.6 share of all edges:
+    → Genuine warning sign. The network has failed to mature past
+      single-point dependency. Surface this to the Cell Steward
+      and Node Admin as a pattern worth attention, per the existing
+      gentle, ignorable, human-delivered suggestion principle
+      (Mission Brief 4.5).
+```
+
+This logic lives in the Structured Intelligence layer (Mission Brief 4.3) — it is a rule, transparent and inspectable, not a machine-learned judgement.
+
+#### 3.4a.4 Feeding Visualisation — Human as the Delivery Mechanism
+
+Per the Captain's explicit framing: this data exists to feed visualisation, but the human remains the delivery mechanism for what it means. Concretely:
+
+- **No raw graph is shown to a general community member**, ever, in MVP. Graph visualisation of this kind is cognitively demanding and not appropriate for the platform's stated low-literacy, low-bandwidth design constraints (Mission Brief Section 10).
+- **The Cell Steward dashboard** (`/steward` route, Section 6.3 below) may show a simple, plain-language summary derived from the latest `NetworkPhaseSnapshot` — e.g. "Your cell is growing — more members are now connecting directly with each other, not just through you" — generated from the phase transition history, not a node-and-edge diagram.
+- **A genuine visual network map** (nodes and edges, rendered graphically) is explicitly Phase 2 — Mission Brief Section 11.3 already lists "Network health visualisation" as Phase 2, and this document does not bring it forward. What MVP delivers instead is the data substrate (the append-only `NetworkPhaseSnapshot` log) so that when the Phase 2 visualisation feature is built, it has a full historical record to render from day one of that feature's launch, rather than starting with no history.
+- **The Regional Steward and Platform Steward Council** (when those roles are active — Phase 2 for Regional Steward tooling specifically) are the appropriate eventual audience for an actual graph view, since their role already requires holding more structural complexity than a Cell Steward's day-to-day work demands.
+
 ### 3.5 Crisis Mode Entities — MVP Scope Only
 
 Mission Brief Section 11.2 lists "Basic Crisis Mode" as Should Have for Phase 1 — simplified interface, Pillar 1-3 filter, resource map priority. The full Crisis Roster and Crisis Roles Framework (Mission Brief Section 7) is explicitly Phase 2 (Section 11.3). MVP needs only:
@@ -322,6 +405,7 @@ POST   /crisis-mode/:node_id/deactivate
 GET    /steward/dashboard/:cell_id        (member list, ledger, needs radar — aggregated, computed)
 GET    /steward/isolates/:cell_id         (Network Health — members with no recent ConnectionEvent)
 GET    /steward/hubs/:cell_id             (Network Health — high connection density, burnout risk flag)
+GET    /steward/network-summary/:cell_id  (Plain-language phase summary, per Section 3.4a.4 — NOT a raw graph)
 POST   /steward/log-offline-trade         (Mission Brief 3.2 — Steward records trades that happened offline)
 
 GET    /admin/node-overview/:node_id
@@ -411,7 +495,7 @@ Pillar-to-colour mapping and UI-state-to-colour mapping (both defined in brand-p
   /components
     /trade-exchange       (Listing cards, create-listing flow, match proposals)
     /marketplace          (Programme Offering cards, request flow — per community-marketplace-spec)
-    /steward-dashboard     (Needs radar, member list, ledger, isolate/hub flags)
+    /steward-dashboard     (Needs radar, member list, ledger, isolate/hub flags, network summary)
     /gifts-profile         (Three-question guided capture)
     /crisis-mode           (Simplified high-contrast crisis UI)
     /shared                (PillarTag, StatusBadge, OfflineIndicator — used everywhere)
@@ -465,6 +549,7 @@ production    → does not exist yet, created when the domain goes live per Capt
 - **Adaptive ML / federated learning infrastructure** (Mission Brief 4.3, 12.2) — Phase 2, genuinely different infrastructure (model training pipeline, not just CRUD) and deserves dedicated design
 - **Voice/USSD interface** (Mission Brief 10.3) — Phase 2, requires Africa's Talking USSD product integration, not yet scoped
 - **Mesh radio integration** (Mission Brief 10.2) — Phase 2, hardware-dependent, out of scope for this document
+- **A genuine graph-visual Network Health Visualisation UI** (Section 3.4a.4) — the data substrate (`NetworkPhaseSnapshot`) is specified and built in MVP; the actual node-and-edge visual rendering is explicitly Phase 2 per Mission Brief 11.3
 
 These are correctly absent here, not forgotten — they belong in their own architecture addenda once their preceding feature specs exist.
 
