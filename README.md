@@ -14,6 +14,15 @@ ResilientSA is that infrastructure. Built on Ubuntu values. Powered by community
 
 Elder Prospectus: [https://deonhanns.github.io/resilientsa/](https://deonhanns.github.io/resilientsa/)
 
+## Crew & Mission Status
+
+- `CREW_MANIFEST.md` — Full crew register, roles, models, escalation paths (aligned to fleet-wide Crew Restructure doctrine)
+- `MISSION_STATUS.md` — Current mission phase, what's shipped, what's open, what's next
+- `OBRIEN_STANDUP.md` — Engine Room session log
+- `SCOTTY_PATTERNS.md` — Engineering pattern library
+- `UHURA_INTEL.md` — SEDA/CIPC/CBDA regulatory and environmental scan log
+- `WORF_ALERTS/` — Security findings log
+
 ## Documents
 
 - `docs/mission-brief-v1.0.md` — Full platform mission brief (vision, roles, architecture, value system, crisis framework, cooperative economy, MVP scope)
@@ -24,15 +33,21 @@ Elder Prospectus: [https://deonhanns.github.io/resilientsa/](https://deonhanns.g
 - `docs/elder-prospectus-v1.0.md` — Elder/Grounder invitation document (markdown source)
 - `docs/claude-design-onboarding-brief.md` — Brief for seeding the Claude Design system
 
-## The Starship Enterprise Model
+## The Crew
 
-| Role | Who | Function |
-|---|---|---|
-| Kirk | Deon (Project Lead) | Captain — vision, final decisions, community navigation |
-| Spock | Claude (Claude.ai) | Strategic partner, product owner, systems architect |
-| O'Brien | Claude (VS Code API) | Lead engineer — builds from bridge specifications, day-to-day development |
-| Scotty | Claude (VS Code API, escalation) | Chief engineer — called in only when something is genuinely hard to resolve in the build |
-| The Ship | This repository | Single source of truth — all documents, code, history |
+Full detail in `CREW_MANIFEST.md`. Summary:
+
+| Role | Model | Layer | Function |
+|---|---|---|---|
+| Captain | Deon (Sketch) Hanns | — | Vision, final decisions, community relationships |
+| Spock | Claude (Claude.ai) | Bridge | Strategy, specs, systems architecture |
+| Uhura | DeepSeek | Bridge | External intelligence — SEDA/CIPC/CBDA, regulatory scanning |
+| Worf | DeepSeek + rules | Bridge | Security oversight, POPIA compliance, veto authority |
+| O'Brien | DeepSeek (Kilo Code) | Engine Room | Primary builder — day-to-day development |
+| Scotty | Claude API | Engine Room | Chief Engineer — escalation only |
+| Bones (McCoy) | Claude Design | Studio (protocol) | UX/CX design gate — invoked on demand, returns a verdict |
+
+This mission follows fleet-wide crew doctrine exactly — see `CREW_MANIFEST.md` for full role definitions, escalation paths, and the Bones Protocol.
 
 ## Naming Architecture
 
@@ -45,12 +60,13 @@ Elder Prospectus: [https://deonhanns.github.io/resilientsa/](https://deonhanns.g
 
 A community member never needs to see or learn the word "Grounder."
 
-## Institutional Relationships (In Progress)
+## Institutional Relationships (Sequenced)
 
-ResilientSA is pursuing direct partnerships — not API integrations — with:
-1. **SEDA** — cooperative development referral pathway (active outreach)
-2. **CIPC** — regulator relationship (Phase 2, once registered cooperatives exist as evidence)
-3. **CBDA** — Financial Services Cooperative gating body (Phase 2/3)
+ResilientSA is pursuing direct partnerships — not API integrations — in this order:
+1. **First community relationship** (Cape Town RA/CPF) — carrying a working prototype, not a pitch
+2. **SEDA** — cooperative development referral pathway (drafted, held pending pilot evidence)
+3. **CIPC** — regulator relationship (Phase 2, once registered cooperatives exist as evidence)
+4. **CBDA** — Financial Services Cooperative gating body (Phase 2/3)
 
 ## Built by
 
@@ -59,4 +75,4 @@ Author, *San Consciousness: The Return of the First Wisdom Keepers*.
 
 ---
 
-*A vision in development. The build begins when the right people are gathered.*
+*A vision in development. Pre-build phase — see `MISSION_STATUS.md` for current state.*
