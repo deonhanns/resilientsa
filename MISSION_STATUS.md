@@ -13,26 +13,21 @@ Updated weekly, or at any major milestone. This is the single document Spock and
 
 ## CURRENT PHASE
 
-**Pre-build.** No application code exists yet. The mission is in the documentation and design-validation phase, per Captain's sequencing decision (2026-06-30 Bridge session):
-
-1. McCoy (Claude Design) produces the first clickable prototype — Trade Exchange, Community Marketplace, Cell Steward dashboard
-2. First community relationship begins (Cape Town RA/CPF), carrying the prototype rather than a pitch document
-3. Technical Architecture Document follows, informed by community feedback
-4. SEDA outreach — held until pilot evidence exists
+**Pre-build, documentation phase.** No application code exists yet. Kilo Code Engine Room configuration is verified working (cold-start test passed, 2026-06-30). Foundational documentation is being completed before any Crew Order is issued — Captain's decision (2026-06-30) was to close remaining doctrine and architecture gaps rather than start building against an incomplete spec set.
 
 **Confirmed (2026-06-30):** ResilientSA is a separate venture, fully independent of the San Scribe Enterprise fleet. It does not appear in `san-scribe-hq/MISSIONS_INDEX.md` and its Crew Orders originate and stay in this repo (`resilientsa/CREW_ORDERS/`), not in any shared HQ.
 
 ---
 
-## ENGINE ROOM CONFIGURATION — LIVE
+## ENGINE ROOM CONFIGURATION — VERIFIED
 
-Kilo Code project rules are configured and committed:
+Kilo Code project rules are configured, committed, and **verified working** via cold-start test (2026-06-30):
 
 - `kilo.jsonc` — project-scoped instructions array, does not touch global Kilo config
-- `.kilo/rules/crew-protocols.md` — loads `CREW_MANIFEST.md` summary, escalation rules, and reporting requirements into every O'Brien session automatically
+- `.kilo/rules/crew-protocols.md` — loads `CREW_MANIFEST.md` summary, escalation rules, branch strategy, and reporting requirements into every O'Brien session automatically
 - `.kilo/rules/security.md` — Worf's PII/POPIA protocols as enforceable rules, with severity guide for `WORF_ALERTS/` filing
 
-**Verification still required:** before any Crew Order is issued, start a fresh O'Brien session in this repo and confirm cold-start compliance — ask "What are you not allowed to do in this codebase?" and "What do you check before marking a PII-related task complete?" Log the result in `OBRIEN_STANDUP.md` as the first entry.
+O'Brien correctly answered both cold-start verification questions, including PII encryption rules, the node-tier data boundary, restricted files, and the three-check PII protocol. One correction made: the branch strategy was clarified — `main` is the working/Vercel-preview branch pre-launch, not protected production. O'Brien's invented "never push to main" assumption was removed and replaced with an explicit rule plus a standing instruction not to invent workflow rules absent from the file.
 
 ---
 
@@ -40,7 +35,8 @@ Kilo Code project rules are configured and committed:
 
 - `CREW_MANIFEST.md`, `OBRIEN_STANDUP.md`, `UHURA_INTEL.md`, `WORF_ALERTS/`, `SCOTTY_PATTERNS.md`, `MISSION_STATUS.md` — crew doctrine scaffolding
 - `CREW_ORDERS/README.md` — 11-element order structure, scoped to this repo
-- `kilo.jsonc` + `.kilo/rules/` — Engine Room configuration, making the above doctrine load automatically rather than relying on manual reference
+- `kilo.jsonc` + `.kilo/rules/` — Engine Room configuration, verified via cold-start test
+- `docs/technical-architecture-v1.0.md` — full data model, API surface, offline sync mechanism (Outbox pattern), frontend architecture, hosting plan. Includes WhatsApp Business API as an augmenting (not replacing) notification channel via the existing Africa's Talking vendor relationship — Captain's addition, grounded in South Africa's 90%+ WhatsApp penetration rate.
 
 ---
 
@@ -48,16 +44,18 @@ Kilo Code project rules are configured and committed:
 
 | Item | Priority | Status |
 |---|---|---|
-| Kilo Code cold-start verification | Immediate | Configuration committed — verification session not yet run |
-| Technical Architecture Document | Immediate | Not started — sequenced after prototype + community feedback |
-| June Holley Integration Guide | Immediate | Not started |
+| Kilo Code cold-start verification | Immediate | **Done** — verified 2026-06-30 |
+| Technical Architecture Document | Immediate | **Done** — `docs/technical-architecture-v1.0.md` |
+| June Holley Integration Guide | Immediate | In progress |
+| Crisis Roles Framework Spec | Immediate (elevated) | Not started — philosophy resolved on Bridge, no buildable spec yet |
+| Community Health Protocol Spec | Immediate (elevated) | Not started — philosophy resolved on Bridge, no buildable spec yet |
+| Bones Protocol formalisation for ResilientSA | Immediate | Not started — defined in CREW_MANIFEST.md, not yet exercised |
+| Build Roadmap (Crew Order sequencing) | Immediate | Not started — final document, sequences all of the above |
 | Community Marketplace Feature Spec | — | Done |
-| Cooperative Formation Feature Spec | — | Done |
+| Cooperative Formation Feature Spec | — | Done — naming consistency vs. Community Marketplace spec not yet re-verified |
 | SEDA Institutional Partnership | — | Drafted, not sent — held pending pilot evidence |
-| First clickable prototype (Bones-gated) | Immediate | Not started — next action |
-| First community relationship | Immediate | Not started — next action |
-| Crisis Roles Workshop Guide | Phase 2 | Not started |
-| Community Health Assessment Tool | Phase 2 | Not started |
+| First clickable prototype (Bones-gated) | Immediate | Not started — blocked on Build Roadmap |
+| First community relationship | Immediate | Not started — blocked on prototype |
 | Voice/USSD Interface Spec | Phase 2 | Not started |
 | Mesh Radio Integration Spec | Phase 2 | Not started |
 | Network Health Visualisation | Phase 2 | Not started |
@@ -75,9 +73,14 @@ Kilo Code project rules are configured and committed:
 
 ## WHAT'S QUEUED NEXT
 
-1. Cold-start verification of Kilo Code configuration (no Crew Order issued until this passes)
-2. Bones Protocol invocation — clickable prototype for Trade Exchange, Community Marketplace, Cell Steward dashboard
-3. Identify first Cape Town RA/CPF relationship
+1. June Holley Integration Guide
+2. Crisis Roles Framework Spec (buildable, not just philosophy)
+3. Community Health Protocol Spec (buildable, not just philosophy)
+4. Bones Protocol formalisation for ResilientSA — first invocation criteria, verdict format
+5. Build Roadmap — sequences all Crew Orders from here to pilot-ready
+6. Re-verify Cooperative Formation spec's Grounder-facing language against Community Marketplace naming
+7. Bones Protocol invocation — clickable prototype
+8. Identify first Cape Town RA/CPF relationship
 
 ---
 
