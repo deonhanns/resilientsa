@@ -30,7 +30,8 @@ Elder Prospectus: [https://deonhanns.github.io/resilientsa/](https://deonhanns.g
 |---|---|---|
 | Kirk | Deon (Project Lead) | Captain — vision, final decisions, community navigation |
 | Spock | Claude (Claude.ai) | Strategic partner, product owner, systems architect |
-| Scotty | Claude (VS Code API) | Engineer — builds from bridge specifications |
+| O'Brien | Claude (VS Code API) | Lead engineer — builds from bridge specifications, day-to-day development |
+| Scotty | Claude (VS Code API, escalation) | Chief engineer — called in only when something is genuinely hard to resolve in the build |
 | The Ship | This repository | Single source of truth — all documents, code, history |
 
 ## Naming Architecture
