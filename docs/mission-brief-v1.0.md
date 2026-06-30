@@ -10,9 +10,10 @@
 |---|---|---|
 | Kirk | Deon (Project Lead) | Captain — vision, final decisions, community navigation |
 | Spock | Claude (Claude.ai) | Strategic partner, product owner, systems architect |
-| Scotty | Claude (VS Code API) | Engineer — builds from bridge specifications |
+| O'Brien | Claude (VS Code API) | Lead engineer — builds from bridge specifications, day-to-day development |
+| Scotty | Claude (VS Code API, escalation) | Chief engineer — called in only when something is genuinely hard to resolve in the build |
 | The Ship | GitHub Repository | Single source of truth — all documents, code, history |
-| The Bridge | This document | Strategic output handed from Spock to Scotty |
+| The Bridge | This document | Strategic output handed from Spock to O'Brien |
 
 ---
 
@@ -29,7 +30,7 @@
 9. Community Onboarding
 10. Offline and Crisis Resilience
 11. MVP Scope
-12. Technical Principles for Scotty
+12. Technical Principles for O'Brien
 13. Phased Roadmap
 14. Open Items for the Bridge
 15. Founding Commitments
@@ -151,7 +152,7 @@ Responsibilities:
 
 ### 3.4 Grounder
 
-Funded organisations or expert individuals who bring programmes, resources, and knowledge to communities at no cost. Grounders are guests, not members. They cannot enter a community without acceptance. Verified through a formal application process reviewed by the Platform Steward Council.
+Funded organisations or expert individuals who bring programmes, resources, and knowledge to communities at no cost. Grounders are guests, not members. They cannot enter a community without acceptance. Verified through a formal application process reviewed by the Platform Steward Council. **Internal/partner-facing term only — see `docs/community-marketplace-spec-v1.0.md` for the community-facing naming architecture (Programme Offering, Community Marketplace).**
 
 > *Grounders bring funded programmes to communities at no cost. Communities choose who enters. Communities evaluate impact.*
 
@@ -195,7 +196,7 @@ The governance layer. Representatives elected from community nodes. Approves Gro
 ### 4.2 Core Platform Modules
 
 **Community Hub**
-Each RA or CPF registers their community as a node. Shows community activity, Grounder programmes, resource map, and a chronological local feed — no algorithm, no likes, no viral content. Inter-community visibility allows nodes to see what others have to offer.
+Each RA or CPF registers their community as a node. Shows community activity, Programme Offerings, resource map, and a chronological local feed — no algorithm, no likes, no viral content. Inter-community visibility allows nodes to see what others have to offer.
 
 **The Trade Exchange**
 Direct listings: I Have Something / I Need Something. Categorised under the Six Pillars. Visual and simple — photo, description, what you want in exchange. Multi-party swap matching handles chains invisibly. The Community Exchange Reference shows recent trade equivalences as a guide, never as a binding price.
@@ -206,8 +207,8 @@ Every member's Gifts Profile. Searchable across cells and communities. In crisis
 **Resource Map**
 Crowdsourced, live-updated map of water points, food gardens, energy resources, medical resources, and safe gathering points. Every member can update it. Works offline with cached last-known data. In crisis, one of the most critical features on the platform.
 
-**Grounder Directory**
-Verified Grounder profiles with programme listings in plain community language. Communities browse and subscribe. Grounders receive auto-generated impact reports for their funders. All communication flows through Cell Stewards.
+**Community Marketplace**
+The community-facing browsing surface for Programme Offerings (Grounder programmes presented in plain language, without exposing internal Grounder/partner terminology). Entry point is "Get Support" — see `docs/community-marketplace-spec-v1.0.md` for the full specification. This supersedes the original "Grounder Directory" framing.
 
 ### 4.3 The Intelligence Layer
 
@@ -237,7 +238,7 @@ The platform uses data *for* users, never *on* users. Key intelligence outputs:
 
 **At cell level:** Living needs pulse — what the cell has surplus of, what it is short of, what skills are available but unused, what trades are waiting for a match, emerging patterns over time.
 
-**At node level:** Community rhythm — which cells are active, which pillars are stressed, which Grounder programmes are engaging, where matches are failing.
+**At node level:** Community rhythm — which cells are active, which pillars are stressed, which Programme Offerings are engaging, where matches are failing.
 
 **At regional level:** Complementarity mapping between communities, stress signal detection, practice diffusion across nodes.
 
@@ -589,7 +590,7 @@ The MVP serves 5 pilot communities — a mix of urban township, peri-urban, and 
 - Basic matching — direct two-party and simple three-party chain
 - Community Exchange Reference — auto-calculated from completed trades
 - Cell Steward dashboard — member list, ledger, needs radar, basic alerts
-- Grounder profiles — programme listings, community subscription, basic inbox
+- Programme Offering profiles — listings, community subscription, basic inbox
 - SMS notifications — all critical alerts available via SMS
 - Offline caching — essential data accessible without connectivity
 
@@ -614,7 +615,7 @@ The MVP serves 5 pilot communities — a mix of urban township, peri-urban, and 
 
 ---
 
-## 12. Technical Principles for Scotty
+## 12. Technical Principles for O'Brien
 
 ### 12.1 Non-Negotiable Constraints
 
@@ -631,7 +632,7 @@ The MVP serves 5 pilot communities — a mix of urban township, peri-urban, and 
 
 ### 12.2 Recommended Technology Stack
 
-*Bridge-level recommendations. Scotty has engineering authority to adapt within the constraints above.*
+*Bridge-level recommendations. O'Brien has engineering authority to adapt within the constraints above. Scotty is called in only when something in the build is genuinely difficult to resolve.*
 
 | Layer | Recommended Approach |
 |---|---|
@@ -672,6 +673,7 @@ The MVP serves 5 pilot communities — a mix of urban township, peri-urban, and 
 |---|---|---|
 | Technical Architecture Document | Immediate | Full data model, API structure, federation spec |
 | June Holley Integration Guide | Immediate | Network Weaver Handbook mapped to platform features |
+| Community Marketplace Feature Spec | Done | See `docs/community-marketplace-spec-v1.0.md` |
 | Cooperative Formation Feature Spec | Done | See `docs/cooperative-formation-spec-v1.0.md` |
 | SEDA Institutional Partnership | Done | See `docs/seda-partnership-brief-v1.0.md` |
 | Crisis Roles Workshop Guide | Phase 2 | Community facilitation guide for Grounder delivery |
