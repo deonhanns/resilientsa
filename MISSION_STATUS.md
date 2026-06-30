@@ -36,7 +36,8 @@ O'Brien correctly answered both cold-start verification questions, including PII
 - `CREW_MANIFEST.md`, `OBRIEN_STANDUP.md`, `UHURA_INTEL.md`, `WORF_ALERTS/`, `SCOTTY_PATTERNS.md`, `MISSION_STATUS.md` — crew doctrine scaffolding
 - `CREW_ORDERS/README.md` — 11-element order structure, scoped to this repo
 - `kilo.jsonc` + `.kilo/rules/` — Engine Room configuration, verified via cold-start test
-- `docs/technical-architecture-v1.0.md` — full data model, API surface, offline sync mechanism (Outbox pattern), frontend architecture, hosting plan. Includes WhatsApp Business API as an augmenting (not replacing) notification channel via the existing Africa's Talking vendor relationship — Captain's addition, grounded in South Africa's 90%+ WhatsApp penetration rate.
+- `docs/technical-architecture-v1.0.md` — full data model, API surface, offline sync mechanism (Outbox pattern), frontend architecture, hosting plan. Includes WhatsApp Business API as an augmenting (not replacing) notification channel via the existing Africa's Talking vendor relationship, and the `NetworkPhaseSnapshot` data model + computation logic for tracking network shape (Scattered Fragments → Hub-and-Spoke → Multi-Hub → Core/Periphery) from day one, feeding human-delivered insight per the calm technology principle.
+- `docs/june-holley-integration-guide-v1.0.md` — Cell Steward training curriculum (4 modules), gifts mapping grounding, the Krebs & Holley four-phase network topology model, Steward sustainability practices ("light work"), and the Essential Capacities framework grounding the future Crisis Roles Framework spec.
 
 ---
 
@@ -45,9 +46,9 @@ O'Brien correctly answered both cold-start verification questions, including PII
 | Item | Priority | Status |
 |---|---|---|
 | Kilo Code cold-start verification | Immediate | **Done** — verified 2026-06-30 |
-| Technical Architecture Document | Immediate | **Done** — `docs/technical-architecture-v1.0.md` |
-| June Holley Integration Guide | Immediate | In progress |
-| Crisis Roles Framework Spec | Immediate (elevated) | Not started — philosophy resolved on Bridge, no buildable spec yet |
+| Technical Architecture Document | Immediate | **Done** — `docs/technical-architecture-v1.0.md`, includes network shape tracking |
+| June Holley Integration Guide | Immediate | **Done** — `docs/june-holley-integration-guide-v1.0.md` |
+| Crisis Roles Framework Spec | Immediate (elevated) | Not started — now has a sourced founding principle (Integration Guide Section 6.3: crisis roles are everyday capacities expressed under pressure) |
 | Community Health Protocol Spec | Immediate (elevated) | Not started — philosophy resolved on Bridge, no buildable spec yet |
 | Bones Protocol formalisation for ResilientSA | Immediate | Not started — defined in CREW_MANIFEST.md, not yet exercised |
 | Build Roadmap (Crew Order sequencing) | Immediate | Not started — final document, sequences all of the above |
@@ -56,12 +57,13 @@ O'Brien correctly answered both cold-start verification questions, including PII
 | SEDA Institutional Partnership | — | Drafted, not sent — held pending pilot evidence |
 | First clickable prototype (Bones-gated) | Immediate | Not started — blocked on Build Roadmap |
 | First community relationship | Immediate | Not started — blocked on prototype |
+| Network Health Visualisation (full graph UI) | Phase 2 | Not started — data substrate (`NetworkPhaseSnapshot`) now built in MVP so this has history to render from day one when built |
 | Voice/USSD Interface Spec | Phase 2 | Not started |
 | Mesh Radio Integration Spec | Phase 2 | Not started |
-| Network Health Visualisation | Phase 2 | Not started |
 | Adaptive ML Architecture | Phase 2 | Not started |
 | CIPC Institutional Partnership | Phase 2 | Not started |
 | CBDA Institutional Partnership | Phase 2/3 | Not started |
+| June Holley / Network Weaving Institute direct relationship | Future | Not started — flagged as a possible Captain-level outreach once real pilot evidence exists, similar to SEDA sequencing |
 
 ---
 
@@ -73,14 +75,13 @@ O'Brien correctly answered both cold-start verification questions, including PII
 
 ## WHAT'S QUEUED NEXT
 
-1. June Holley Integration Guide
-2. Crisis Roles Framework Spec (buildable, not just philosophy)
-3. Community Health Protocol Spec (buildable, not just philosophy)
-4. Bones Protocol formalisation for ResilientSA — first invocation criteria, verdict format
-5. Build Roadmap — sequences all Crew Orders from here to pilot-ready
-6. Re-verify Cooperative Formation spec's Grounder-facing language against Community Marketplace naming
-7. Bones Protocol invocation — clickable prototype
-8. Identify first Cape Town RA/CPF relationship
+1. Crisis Roles Framework Spec (buildable, not just philosophy — now has a sourced founding principle to build from)
+2. Community Health Protocol Spec (buildable, not just philosophy)
+3. Bones Protocol formalisation for ResilientSA — first invocation criteria, verdict format
+4. Build Roadmap — sequences all Crew Orders from here to pilot-ready
+5. Re-verify Cooperative Formation spec's Grounder-facing language against Community Marketplace naming
+6. Bones Protocol invocation — clickable prototype
+7. Identify first Cape Town RA/CPF relationship
 
 ---
 
