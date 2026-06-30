@@ -17,6 +17,7 @@ Elder Prospectus: [https://deonhanns.github.io/resilientsa/](https://deonhanns.g
 ## Documents
 
 - `docs/mission-brief-v1.0.md` — Full platform mission brief (vision, roles, architecture, value system, crisis framework, cooperative economy, MVP scope)
+- `docs/community-marketplace-spec-v1.0.md` — Community Marketplace feature spec (Programme Offerings, "Get Support" entry point, separates internal Grounder identity from community-facing language)
 - `docs/cooperative-formation-spec-v1.0.md` — Cooperative Formation feature spec (CIPC-aligned, assisted filing tool)
 - `docs/seda-partnership-brief-v1.0.md` — SEDA institutional partnership one-pager
 - `docs/brand-palette-v1.0.md` — Brand identity system ("Living Soil" palette, typography, components)
@@ -31,6 +32,17 @@ Elder Prospectus: [https://deonhanns.github.io/resilientsa/](https://deonhanns.g
 | Spock | Claude (Claude.ai) | Strategic partner, product owner, systems architect |
 | Scotty | Claude (VS Code API) | Engineer — builds from bridge specifications |
 | The Ship | This repository | Single source of truth — all documents, code, history |
+
+## Naming Architecture
+
+| Term | Audience |
+|---|---|
+| **Grounder** | Internal / partner-facing only — verification, vetting, impact reporting, partner agreements |
+| **Programme Offering** | Community-facing — the catalogue item a Cell Steward browses and requests |
+| **Get Support** | Community-facing — the plain-language entry point |
+| **Community Marketplace** | Community-facing — the section of the platform where Programme Offerings live |
+
+A community member never needs to see or learn the word "Grounder."
 
 ## Institutional Relationships (In Progress)
 
