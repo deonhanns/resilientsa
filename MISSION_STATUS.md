@@ -20,11 +20,27 @@ Updated weekly, or at any major milestone. This is the single document Spock and
 3. Technical Architecture Document follows, informed by community feedback
 4. SEDA outreach — held until pilot evidence exists
 
+**Confirmed (2026-06-30):** ResilientSA is a separate venture, fully independent of the San Scribe Enterprise fleet. It does not appear in `san-scribe-hq/MISSIONS_INDEX.md` and its Crew Orders originate and stay in this repo (`resilientsa/CREW_ORDERS/`), not in any shared HQ.
+
+---
+
+## ENGINE ROOM CONFIGURATION — LIVE
+
+Kilo Code project rules are configured and committed:
+
+- `kilo.jsonc` — project-scoped instructions array, does not touch global Kilo config
+- `.kilo/rules/crew-protocols.md` — loads `CREW_MANIFEST.md` summary, escalation rules, and reporting requirements into every O'Brien session automatically
+- `.kilo/rules/security.md` — Worf's PII/POPIA protocols as enforceable rules, with severity guide for `WORF_ALERTS/` filing
+
+**Verification still required:** before any Crew Order is issued, start a fresh O'Brien session in this repo and confirm cold-start compliance — ask "What are you not allowed to do in this codebase?" and "What do you check before marking a PII-related task complete?" Log the result in `OBRIEN_STANDUP.md` as the first entry.
+
 ---
 
 ## WHAT SHIPPED THIS WEEK
 
-*Nothing yet — mission documentation phase.*
+- `CREW_MANIFEST.md`, `OBRIEN_STANDUP.md`, `UHURA_INTEL.md`, `WORF_ALERTS/`, `SCOTTY_PATTERNS.md`, `MISSION_STATUS.md` — crew doctrine scaffolding
+- `CREW_ORDERS/README.md` — 11-element order structure, scoped to this repo
+- `kilo.jsonc` + `.kilo/rules/` — Engine Room configuration, making the above doctrine load automatically rather than relying on manual reference
 
 ---
 
@@ -32,6 +48,7 @@ Updated weekly, or at any major milestone. This is the single document Spock and
 
 | Item | Priority | Status |
 |---|---|---|
+| Kilo Code cold-start verification | Immediate | Configuration committed — verification session not yet run |
 | Technical Architecture Document | Immediate | Not started — sequenced after prototype + community feedback |
 | June Holley Integration Guide | Immediate | Not started |
 | Community Marketplace Feature Spec | — | Done |
@@ -58,8 +75,9 @@ Updated weekly, or at any major milestone. This is the single document Spock and
 
 ## WHAT'S QUEUED NEXT
 
-1. Bones Protocol invocation — clickable prototype for Trade Exchange, Community Marketplace, Cell Steward dashboard
-2. Identify first Cape Town RA/CPF relationship
+1. Cold-start verification of Kilo Code configuration (no Crew Order issued until this passes)
+2. Bones Protocol invocation — clickable prototype for Trade Exchange, Community Marketplace, Cell Steward dashboard
+3. Identify first Cape Town RA/CPF relationship
 
 ---
 
