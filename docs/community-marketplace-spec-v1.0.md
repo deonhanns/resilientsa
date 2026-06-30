@@ -110,7 +110,7 @@ Consistent with the platform-wide rejection of algorithmic scoring (Mission Brie
 
 ---
 
-## 8. Data Model Additions (for Scotty)
+## 8. Data Model Additions (for O'Brien)
 
 ```
 ProgrammeOffering {
