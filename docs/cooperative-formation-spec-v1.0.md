@@ -165,7 +165,7 @@ This is the realistic answer to "how does a community without legal access actua
 
 ---
 
-## 9. Data Model Additions (for Scotty)
+## 9. Data Model Additions (for O'Brien)
 
 New entities required at the community node tier:
 
