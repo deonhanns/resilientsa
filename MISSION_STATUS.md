@@ -1,69 +1,68 @@
 # MISSION STATUS
 **Mission:** ResilientSA
 **Custodian:** Spock (compiled from individual crew standups)
-**Status:** ACTIVE — pre-build phase
-
----
-
-## HOW TO USE THIS DOCUMENT
-
-Updated weekly, or at any major milestone. This is the single document Spock and Captain read to assess true mission state without reconstructing it from individual crew logs.
+**Status:** ACTIVE — pre-build phase, documentation sprint
 
 ---
 
 ## CURRENT PHASE
 
-**Pre-build, documentation phase.** No application code exists yet. Kilo Code Engine Room configuration is verified working (cold-start test passed, 2026-06-30). Foundational documentation is being completed before any Crew Order is issued — Captain's decision (2026-06-30) was to close remaining doctrine and architecture gaps rather than start building against an incomplete spec set.
+**Pre-build, documentation sprint.** No application code exists yet. Kilo Code Engine Room configuration is verified working. Captain's decision (2026-06-30): close all doctrine and architecture gaps before any Crew Order is issued.
 
-**Confirmed (2026-06-30):** ResilientSA is a separate venture, fully independent of the San Scribe Enterprise fleet. It does not appear in `san-scribe-hq/MISSIONS_INDEX.md` and its Crew Orders originate and stay in this repo (`resilientsa/CREW_ORDERS/`), not in any shared HQ.
+**Confirmed:** ResilientSA is a separate venture, fully independent of the San Scribe Enterprise fleet.
 
 ---
 
 ## ENGINE ROOM CONFIGURATION — VERIFIED
 
-Kilo Code project rules are configured, committed, and **verified working** via cold-start test (2026-06-30):
-
-- `kilo.jsonc` — project-scoped instructions array, does not touch global Kilo config
-- `.kilo/rules/crew-protocols.md` — loads `CREW_MANIFEST.md` summary, escalation rules, branch strategy, and reporting requirements into every O'Brien session automatically
-- `.kilo/rules/security.md` — Worf's PII/POPIA protocols as enforceable rules, with severity guide for `WORF_ALERTS/` filing
-
-O'Brien correctly answered both cold-start verification questions, including PII encryption rules, the node-tier data boundary, restricted files, and the three-check PII protocol. One correction made: the branch strategy was clarified — `main` is the working/Vercel-preview branch pre-launch, not protected production. O'Brien's invented "never push to main" assumption was removed and replaced with an explicit rule plus a standing instruction not to invent workflow rules absent from the file.
+- `kilo.jsonc` + `.kilo/rules/` — live, cold-start verified 2026-06-30
+- Branch strategy: `main` is working/Vercel-preview branch pre-launch
 
 ---
 
-## WHAT SHIPPED THIS WEEK
+## WHAT HAS SHIPPED
 
-- `CREW_MANIFEST.md`, `OBRIEN_STANDUP.md`, `UHURA_INTEL.md`, `WORF_ALERTS/`, `SCOTTY_PATTERNS.md`, `MISSION_STATUS.md` — crew doctrine scaffolding
-- `CREW_ORDERS/README.md` — 11-element order structure, scoped to this repo
-- `kilo.jsonc` + `.kilo/rules/` — Engine Room configuration, verified via cold-start test
-- `docs/technical-architecture-v1.0.md` — full data model, API surface, offline sync mechanism (Outbox pattern), frontend architecture, hosting plan. Includes WhatsApp Business API as an augmenting (not replacing) notification channel via the existing Africa's Talking vendor relationship, and the `NetworkPhaseSnapshot` data model + computation logic for tracking network shape (Scattered Fragments → Hub-and-Spoke → Multi-Hub → Core/Periphery) from day one, feeding human-delivered insight per the calm technology principle.
-- `docs/june-holley-integration-guide-v1.0.md` — Cell Steward training curriculum (4 modules), gifts mapping grounding, the Krebs & Holley four-phase network topology model, Steward sustainability practices ("light work"), and the Essential Capacities framework grounding the future Crisis Roles Framework spec.
+| Document | Path | Status |
+|---|---|---|
+| Mission Brief v1.0 | `docs/mission-brief-v1.0.md` | Done |
+| Technical Architecture v1.0 | `docs/technical-architecture-v1.0.md` | Done — includes NetworkPhaseSnapshot, WhatsApp augmentation |
+| June Holley Integration Guide v1.0 | `docs/june-holley-integration-guide-v1.0.md` | Done — four-phase topology, Cell Steward curriculum, Steward sustainability |
+| Crisis Roles Framework Spec v1.0 | `docs/crisis-roles-framework-spec-v1.0.md` | Done — buildable workshop, data model, tier calibration |
+| Anticipatory Intelligence Spec v1.0 | `docs/anticipatory-intelligence-spec-v1.0.md` | Done — two-kind anticipation, convergence, five-layer cascade, named sources |
+| Pillar Integration Reference v1.0 | `docs/pillar-integration-reference-v1.0.md` | Done — single source of pillar truth, all entity mappings, TypeScript constants, sport worked example |
+| Community Marketplace Spec v1.0 | `docs/community-marketplace-spec-v1.0.md` | Done |
+| Cooperative Formation Spec v1.0 | `docs/cooperative-formation-spec-v1.0.md` | Done |
+| SEDA Partnership Brief v1.0 | `docs/seda-partnership-brief-v1.0.md` | Done — held, not sent |
+| Brand Palette v1.0 | `docs/brand-palette-v1.0.md` | Done |
+| Elder Prospectus v1.0 | `docs/elder-prospectus-v1.0.md` | Done |
+| Claude Design Onboarding Brief | `docs/claude-design-onboarding-brief.md` | Done |
+| CREW_MANIFEST.md | `CREW_MANIFEST.md` | Done — fleet doctrine aligned |
+| CREW_ORDERS/ | `CREW_ORDERS/README.md` | Done — 11-element structure |
+| OBRIEN_STANDUP.md | `OBRIEN_STANDUP.md` | Seeded |
+| SCOTTY_PATTERNS.md | `SCOTTY_PATTERNS.md` | Seeded |
+| UHURA_INTEL.md | `UHURA_INTEL.md` | Seeded — needs Community Resilience Signal Watch section added |
+| WORF_ALERTS/ | `WORF_ALERTS/README.md` | Seeded |
 
 ---
 
-## OPEN ITEMS (from Mission Brief Section 14)
+## OPEN ITEMS
 
 | Item | Priority | Status |
 |---|---|---|
-| Kilo Code cold-start verification | Immediate | **Done** — verified 2026-06-30 |
-| Technical Architecture Document | Immediate | **Done** — `docs/technical-architecture-v1.0.md`, includes network shape tracking |
-| June Holley Integration Guide | Immediate | **Done** — `docs/june-holley-integration-guide-v1.0.md` |
-| Crisis Roles Framework Spec | Immediate (elevated) | Not started — now has a sourced founding principle (Integration Guide Section 6.3: crisis roles are everyday capacities expressed under pressure) |
-| Community Health Protocol Spec | Immediate (elevated) | Not started — philosophy resolved on Bridge, no buildable spec yet |
-| Bones Protocol formalisation for ResilientSA | Immediate | Not started — defined in CREW_MANIFEST.md, not yet exercised |
-| Build Roadmap (Crew Order sequencing) | Immediate | Not started — final document, sequences all of the above |
-| Community Marketplace Feature Spec | — | Done |
-| Cooperative Formation Feature Spec | — | Done — naming consistency vs. Community Marketplace spec not yet re-verified |
-| SEDA Institutional Partnership | — | Drafted, not sent — held pending pilot evidence |
+| Community Health Protocol Spec | Immediate | **In progress** — next document |
+| Bones Protocol formalisation | Immediate | Not started |
+| Build Roadmap (Crew Order sequencing) | Immediate | Not started — final document |
+| UHURA_INTEL.md Community Resilience Signal Watch section | Immediate | Not started — flagged in Anticipatory Intelligence Spec Section 3.3 |
+| Cooperative Formation spec naming consistency vs. Community Marketplace | Minor | Not started |
 | First clickable prototype (Bones-gated) | Immediate | Not started — blocked on Build Roadmap |
-| First community relationship | Immediate | Not started — blocked on prototype |
-| Network Health Visualisation (full graph UI) | Phase 2 | Not started — data substrate (`NetworkPhaseSnapshot`) now built in MVP so this has history to render from day one when built |
+| First community relationship (Cape Town RA/CPF) | Immediate | Not started — blocked on prototype |
+| Network Health Visualisation full UI | Phase 2 | Data substrate built in MVP |
 | Voice/USSD Interface Spec | Phase 2 | Not started |
 | Mesh Radio Integration Spec | Phase 2 | Not started |
 | Adaptive ML Architecture | Phase 2 | Not started |
 | CIPC Institutional Partnership | Phase 2 | Not started |
 | CBDA Institutional Partnership | Phase 2/3 | Not started |
-| June Holley / Network Weaving Institute direct relationship | Future | Not started — flagged as a possible Captain-level outreach once real pilot evidence exists, similar to SEDA sequencing |
+| June Holley / Network Weaving Institute direct outreach | Future | Held pending pilot evidence |
 
 ---
 
@@ -73,17 +72,15 @@ O'Brien correctly answered both cold-start verification questions, including PII
 
 ---
 
-## WHAT'S QUEUED NEXT
+## NEXT
 
-1. Crisis Roles Framework Spec (buildable, not just philosophy — now has a sourced founding principle to build from)
-2. Community Health Protocol Spec (buildable, not just philosophy)
-3. Bones Protocol formalisation for ResilientSA — first invocation criteria, verdict format
-4. Build Roadmap — sequences all Crew Orders from here to pilot-ready
-5. Re-verify Cooperative Formation spec's Grounder-facing language against Community Marketplace naming
-6. Bones Protocol invocation — clickable prototype
-7. Identify first Cape Town RA/CPF relationship
+1. Community Health Protocol Spec
+2. Bones Protocol formalisation
+3. Build Roadmap
+4. UHURA_INTEL.md Community Resilience Signal Watch section
+5. Bones invocation — clickable prototype
+6. First Cape Town RA/CPF relationship
 
 ---
 
-*Last updated: 2026-06-30*
-*Next update: at next major milestone*
+*Last updated: 2026-07-01*
