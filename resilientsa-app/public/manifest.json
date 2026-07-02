@@ -1,0 +1,10 @@
+{
+  "name": "ResilientSA",
+  "short_name": "ResilientSA",
+  "description": "Community resilience, cell by cell",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F4F4F2",
+  "theme_color": "#2C2A29",
+  "icons": []
+}

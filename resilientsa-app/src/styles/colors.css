@@ -1,0 +1,92 @@
+/* ============================================================
+   Living Soil — Colour Tokens
+   ResilientSA. Baobab Bark on Canvas Grey. Never pure #000/#fff.
+   Pillar colours carry meaning. Do not invent new ones.
+   ============================================================ */
+:root {
+  /* --- Foundation neutrals (Baobab Bark family) --- */
+  --bark-900: #2C2A29;   /* Baobab Bark — all text & linework */
+  --bark-700: #47433F;   /* strong secondary ink */
+  --bark-600: #5C5854;   /* secondary text */
+  --bark-400: #8A857F;   /* muted / tertiary text, placeholder */
+  --bark-200: #C9C6C1;   /* disabled ink, faint icon */
+
+  /* --- Canvas Grey family (backgrounds) --- */
+  --canvas: #F4F4F2;     /* Canvas Grey — all page backgrounds */
+  --canvas-raised: #FBFBF9; /* card surface, one step up from canvas */
+  --canvas-sunk: #EAEAE6;   /* wells, track backgrounds, sunken rows */
+  --line: rgba(44, 42, 41, 0.12);      /* hairline border */
+  --line-strong: rgba(44, 42, 41, 0.22); /* emphasised border */
+
+  /* --- Living Soil pillar hues (base) --- */
+  --aloe: #4A7256;       /* Fynbos Aloe */
+  --ochre: #C85A3C;      /* Ochre Earth */
+  --clay: #E6A854;       /* Sunbaked Clay */
+  --rain: #3D6B8C;       /* Rainwater Blue */
+
+  /* Pressed / hover-dark variants (hand-mixed, same hue) */
+  --aloe-deep: #3B5D46;
+  --ochre-deep: #A9482E;
+  --clay-deep: #C98A3A;
+  --rain-deep: #315874;
+
+  /* Protea Rose — Health (SA's national flower) */
+  --protea: #B24C63;
+  --protea-deep: #954052;
+  /* Indigo Cloth — Skills & Trade (shweshwe textile) */
+  --indigo: #5E5A8C;
+  --indigo-deep: #4B4770;
+
+  /* Soft tints on Canvas Grey — pillar tag & surface fills */
+  --aloe-tint: #E4EBE5;
+  --ochre-tint: #F5E3DC;
+  --clay-tint: #F9EFDA;
+  --rain-tint: #E0E8ED;
+  --protea-tint: #F3E1E6;
+  --indigo-tint: #E7E5F0;
+
+  /* ============================================================
+     SEMANTIC ALIASES — reach for these in components
+     ============================================================ */
+  --text-primary: var(--bark-900);
+  --text-secondary: var(--bark-600);
+  --text-muted: var(--bark-400);
+  --text-on-fill: var(--canvas);        /* text sitting on a pillar hue */
+
+  --bg-page: var(--canvas);
+  --surface-card: var(--canvas-raised);
+  --surface-sunk: var(--canvas-sunk);
+
+  --border-hairline: var(--line);
+  --border-strong: var(--line-strong);
+
+  --action-primary: var(--aloe);        /* primary CTA */
+  --action-primary-press: var(--aloe-deep);
+
+  /* State signals */
+  --signal-success: var(--aloe);
+  --signal-urgent: var(--ochre);         /* crisis / alert */
+  --signal-pending: var(--clay);         /* waiting / in-progress */
+  --signal-info: var(--rain);            /* informational / navigation */
+
+  /* ============================================================
+     SIX PILLARS — each has its own on-brand earth hue + tint.
+     Water · Food · Health · Safety · Energy · Skills & Trade
+     ============================================================ */
+  --pillar-water: var(--rain);
+  --pillar-water-tint: var(--rain-tint);
+  --pillar-food: var(--aloe);
+  --pillar-food-tint: var(--aloe-tint);
+  --pillar-health: var(--protea);
+  --pillar-health-tint: var(--protea-tint);
+  --pillar-safety: var(--ochre);
+  --pillar-safety-tint: var(--ochre-tint);
+  --pillar-energy: var(--clay);
+  --pillar-energy-tint: var(--clay-tint);
+  --pillar-skills: var(--indigo);
+  --pillar-skills-tint: var(--indigo-tint);
+
+  /* Listing state accents */
+  --offer: var(--aloe);   /* something given */
+  --need: var(--ochre);   /* something asked for */
+}

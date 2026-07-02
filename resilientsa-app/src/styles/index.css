@@ -1,0 +1,67 @@
+/* ============================================================
+   ResilientSA — Master stylesheet
+   Living Soil Design System token wiring + Tailwind
+   ============================================================ */
+
+/* Design tokens from McCoy's Living Soil Design System */
+@import './fonts.css';
+@import './colors.css';
+@import './typography.css';
+@import './spacing.css';
+
+/* Tailwind v4 — uses CSS-first @theme configuration */
+@import 'tailwindcss';
+
+/* ============================================================
+   Tailwind v4 theme — Living Soil tokens wired as utilities
+   ============================================================ */
+@theme {
+  /* --- Foundation neutrals (Baobab Bark family) --- */
+  --color-baobab-bark: #2C2A29;
+  --color-canvas-grey: #F4F4F2;
+  --color-canvas-raised: #FBFBF9;
+  --color-canvas-sunk: #EAEAE6;
+
+  /* --- Six Pillar colours (McCoy canonical) --- */
+  --color-pillar-water: #3D6B8C;
+  --color-pillar-food: #4A7256;
+  --color-pillar-health: #B24C63;
+  --color-pillar-safety: #C85A3C;
+  --color-pillar-energy: #E6A854;
+  --color-pillar-skills: #5E5A8C;
+
+  /* --- Pillar tints (soft backgrounds) --- */
+  --color-pillar-water-tint: #E0E8ED;
+  --color-pillar-food-tint: #E4EBE5;
+  --color-pillar-health-tint: #F3E1E6;
+  --color-pillar-safety-tint: #F5E3DC;
+  --color-pillar-energy-tint: #F9EFDA;
+  --color-pillar-skills-tint: #E7E5F0;
+
+  /* --- Actions & signals --- */
+  --color-action-primary: #4A7256;
+  --color-signal-urgent: #C85A3C;
+  --color-signal-pending: #E6A854;
+  --color-signal-info: #3D6B8C;
+
+  /* --- Typography --- */
+  --font-family-heading: 'Ubuntu', 'Work Sans', sans-serif;
+  --font-family-body: 'Inter', 'Roboto', sans-serif;
+
+  /* --- Radii — warm, grounded --- */
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-full: 999px;
+}
+
+/* ============================================================
+   Base layer — body defaults
+   ============================================================ */
+@layer base {
+  body {
+    background-color: var(--canvas);
+    color: var(--bark-900);
+    font-family: var(--font-body);
+  }
+}

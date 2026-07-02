@@ -1,0 +1,44 @@
+{
+  "nav": {
+    "exchange": "Exchange",
+    "support": "Get support",
+    "steward": "Steward"
+  },
+  "pillars": {
+    "water": "Water",
+    "food": "Food",
+    "health": "Health",
+    "safety": "Safety",
+    "energy": "Energy",
+    "skills": "Skills & Trade"
+  },
+  "exchange": {
+    "title": "Trade Exchange",
+    "filter_all": "Everything",
+    "filter_offer": "Offering",
+    "filter_need": "Needing",
+    "offer_label": "Offering",
+    "need_label": "Needed",
+    "i_want_this": "I want this",
+    "i_can_help": "I can help",
+    "match_member": "Match a member",
+    "share_title": "Share with your cell",
+    "im_offering": "I'm offering",
+    "i_need_help": "I need help",
+    "post_to_cell": "Post to the cell"
+  },
+  "support": {
+    "title": "Get support",
+    "question": "What kind of support does your community need?",
+    "subtitle": "Tap one to see what other communities have used.",
+    "request_btn": "Request for our community",
+    "used_by": "{{count}} communities used this"
+  },
+  "steward": {
+    "title": "Steward view",
+    "network_summary": "More members are connecting directly with each other, not just through you.",
+    "needs_title": "Where the need is",
+    "members_title": "Your members",
+    "out_of_touch": "{{count}} out of touch"
+  }
+}
