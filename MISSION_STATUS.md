@@ -1,68 +1,84 @@
 # MISSION STATUS
 **Mission:** ResilientSA
-**Custodian:** Spock (compiled from individual crew standups)
-**Status:** ACTIVE — pre-build phase, documentation sprint
+**Custodian:** Spock
+**Status:** ACTIVE — documentation sprint COMPLETE. Ready to build.
 
 ---
 
 ## CURRENT PHASE
 
-**Pre-build, documentation sprint.** No application code exists yet. Kilo Code Engine Room configuration is verified working. Captain's decision (2026-06-30): close all doctrine and architecture gaps before any Crew Order is issued.
+**Pre-build documentation sprint: COMPLETE.**
 
-**Confirmed:** ResilientSA is a separate venture, fully independent of the San Scribe Enterprise fleet.
+All doctrine, architecture, and feature gaps are closed. The ship is ready for ORDER 001 — the clickable prototype. No Crew Order is issued until ORDER 001 is complete and Bones-approved.
 
----
-
-## ENGINE ROOM CONFIGURATION — VERIFIED
-
-- `kilo.jsonc` + `.kilo/rules/` — live, cold-start verified 2026-06-30
-- Branch strategy: `main` is working/Vercel-preview branch pre-launch
+**Engine Room configuration:** Kilo Code cold-start verified 2026-06-30. Branch strategy: `main` is working/Vercel-preview branch pre-launch.
 
 ---
 
-## WHAT HAS SHIPPED
+## THE FULL DOCUMENT SET
 
 | Document | Path | Status |
 |---|---|---|
-| Mission Brief v1.0 | `docs/mission-brief-v1.0.md` | Done |
-| Technical Architecture v1.0 | `docs/technical-architecture-v1.0.md` | Done — includes NetworkPhaseSnapshot, WhatsApp augmentation |
-| June Holley Integration Guide v1.0 | `docs/june-holley-integration-guide-v1.0.md` | Done — four-phase topology, Cell Steward curriculum, Steward sustainability |
-| Crisis Roles Framework Spec v1.0 | `docs/crisis-roles-framework-spec-v1.0.md` | Done — buildable workshop, data model, tier calibration |
-| Anticipatory Intelligence Spec v1.0 | `docs/anticipatory-intelligence-spec-v1.0.md` | Done — two-kind anticipation, convergence, five-layer cascade, named sources |
-| Pillar Integration Reference v1.0 | `docs/pillar-integration-reference-v1.0.md` | Done — single source of pillar truth, all entity mappings, TypeScript constants, sport worked example |
-| Community Marketplace Spec v1.0 | `docs/community-marketplace-spec-v1.0.md` | Done |
-| Cooperative Formation Spec v1.0 | `docs/cooperative-formation-spec-v1.0.md` | Done |
-| SEDA Partnership Brief v1.0 | `docs/seda-partnership-brief-v1.0.md` | Done — held, not sent |
-| Brand Palette v1.0 | `docs/brand-palette-v1.0.md` | Done |
-| Elder Prospectus v1.0 | `docs/elder-prospectus-v1.0.md` | Done |
-| Claude Design Onboarding Brief | `docs/claude-design-onboarding-brief.md` | Done |
-| CREW_MANIFEST.md | `CREW_MANIFEST.md` | Done — fleet doctrine aligned |
-| CREW_ORDERS/ | `CREW_ORDERS/README.md` | Done — 11-element structure |
-| OBRIEN_STANDUP.md | `OBRIEN_STANDUP.md` | Seeded |
-| SCOTTY_PATTERNS.md | `SCOTTY_PATTERNS.md` | Seeded |
-| UHURA_INTEL.md | `UHURA_INTEL.md` | Seeded — needs Community Resilience Signal Watch section added |
-| WORF_ALERTS/ | `WORF_ALERTS/README.md` | Seeded |
+| Mission Brief v1.0 | `docs/mission-brief-v1.0.md` | ✅ Done |
+| Technical Architecture v1.0 | `docs/technical-architecture-v1.0.md` | ✅ Done |
+| June Holley Integration Guide v1.0 | `docs/june-holley-integration-guide-v1.0.md` | ✅ Done |
+| Crisis Roles Framework Spec v1.0 | `docs/crisis-roles-framework-spec-v1.0.md` | ✅ Done |
+| Anticipatory Intelligence Spec v1.0 | `docs/anticipatory-intelligence-spec-v1.0.md` | ✅ Done |
+| Pillar Integration Reference v1.0 | `docs/pillar-integration-reference-v1.0.md` | ✅ Done |
+| Community Health Protocol Spec v1.0 | `docs/community-health-protocol-spec-v1.0.md` | ✅ Done |
+| Bones Protocol v1.0 | `docs/bones-protocol-v1.0.md` | ✅ Done |
+| Build Roadmap v1.0 | `docs/build-roadmap-v1.0.md` | ✅ Done |
+| Community Marketplace Spec v1.0 | `docs/community-marketplace-spec-v1.0.md` | ✅ Done |
+| Cooperative Formation Spec v1.0 | `docs/cooperative-formation-spec-v1.0.md` | ✅ Done |
+| SEDA Partnership Brief v1.0 | `docs/seda-partnership-brief-v1.0.md` | ✅ Done — held, not sent |
+| Brand Palette v1.0 | `docs/brand-palette-v1.0.md` | ✅ Done |
+| Elder Prospectus v1.0 | `docs/elder-prospectus-v1.0.md` | ✅ Done |
+| Claude Design Onboarding Brief | `docs/claude-design-onboarding-brief.md` | ✅ Done |
 
 ---
 
-## OPEN ITEMS
+## CREW FILES
 
-| Item | Priority | Status |
-|---|---|---|
-| Community Health Protocol Spec | Immediate | **In progress** — next document |
-| Bones Protocol formalisation | Immediate | Not started |
-| Build Roadmap (Crew Order sequencing) | Immediate | Not started — final document |
-| UHURA_INTEL.md Community Resilience Signal Watch section | Immediate | Not started — flagged in Anticipatory Intelligence Spec Section 3.3 |
-| Cooperative Formation spec naming consistency vs. Community Marketplace | Minor | Not started |
-| First clickable prototype (Bones-gated) | Immediate | Not started — blocked on Build Roadmap |
-| First community relationship (Cape Town RA/CPF) | Immediate | Not started — blocked on prototype |
-| Network Health Visualisation full UI | Phase 2 | Data substrate built in MVP |
-| Voice/USSD Interface Spec | Phase 2 | Not started |
-| Mesh Radio Integration Spec | Phase 2 | Not started |
-| Adaptive ML Architecture | Phase 2 | Not started |
-| CIPC Institutional Partnership | Phase 2 | Not started |
-| CBDA Institutional Partnership | Phase 2/3 | Not started |
-| June Holley / Network Weaving Institute direct outreach | Future | Held pending pilot evidence |
+| File | Status |
+|---|---|
+| `CREW_MANIFEST.md` | ✅ Done — fleet doctrine aligned |
+| `CREW_ORDERS/README.md` | ✅ Done — 11-element structure |
+| `OBRIEN_STANDUP.md` | ✅ Seeded |
+| `SCOTTY_PATTERNS.md` | ✅ Seeded |
+| `UHURA_INTEL.md` | ✅ Done — regulatory watch + community resilience signal watch |
+| `WORF_ALERTS/README.md` | ✅ Seeded |
+| `kilo.jsonc` | ✅ Done — project-scoped |
+| `.kilo/rules/crew-protocols.md` | ✅ Done — cold-start verified |
+| `.kilo/rules/security.md` | ✅ Done |
+
+---
+
+## BUILD SEQUENCE (from `docs/build-roadmap-v1.0.md`)
+
+| Order | What | Owner | Status |
+|---|---|---|---|
+| 001 | Clickable Prototype | McCoy (Claude Design) | **NEXT ACTION** |
+| 002 | Project Scaffold + Design Tokens | O'Brien | Pending 001 |
+| 003 | PostgreSQL Schema | O'Brien | Pending 002 |
+| 004 | Authentication | O'Brien | Pending 003 |
+| 005 | Gifts Profile | O'Brien | Pending 004 |
+| 006 | Trade Exchange | O'Brien | Pending 005 |
+| 007 | Cell Steward Dashboard + Batch Jobs | O'Brien | Pending 006 |
+| 008 | Community Marketplace | O'Brien | Pending 006 (parallel with 007) |
+| 009 | Notifications (SMS + WhatsApp) | O'Brien | Pending 004, 006, 007 |
+| 010 | Crisis Mode + Resource Map | O'Brien | Pending 006, 009 |
+
+---
+
+## CAPTAIN-LEVEL ACTIONS (not Crew Orders)
+
+| Action | Timing |
+|---|---|
+| Open first Cape Town RA/CPF relationship | After ORDER 001 prototype is Bones-approved |
+| Send SEDA partnership brief | After ORDER 010 — pilot evidence required |
+| CIPC relationship | Phase 2 — after registered cooperatives exist |
+| CBDA relationship | Phase 2/3 |
+| June Holley / Network Weaving Institute outreach | Future — after pilot evidence |
 
 ---
 
@@ -72,15 +88,5 @@
 
 ---
 
-## NEXT
-
-1. Community Health Protocol Spec
-2. Bones Protocol formalisation
-3. Build Roadmap
-4. UHURA_INTEL.md Community Resilience Signal Watch section
-5. Bones invocation — clickable prototype
-6. First Cape Town RA/CPF relationship
-
----
-
-*Last updated: 2026-07-01*
+*Last updated: 2026-07-02*
+*Next update: on ORDER 001 completion*
