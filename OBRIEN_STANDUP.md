@@ -1,7 +1,7 @@
 # O'BRIEN STANDUP
 **Mission:** ResilientSA
 **Custodian:** O'Brien (Primary Builder)
-**Status:** ACTIVE — CREW-ORDER-002 complete
+**Status:** ACTIVE — CREW-ORDER-002 complete, ORDER-003 complete
 
 ---
 
@@ -82,6 +82,57 @@ If blocked on the same issue for 3 consecutive sessions, escalate to Scotty per 
 - Nothing flagged. No PII in scope. No human-facing output (Bones not required per ORDER 002 Section 3).
 
 **Next:** Awaiting CREW-ORDER-003 (PostgreSQL Schema).
+
+---
+
+### Session — 2026-07-02 (ORDER 003)
+
+**What I worked on:**
+- CREW-ORDER-003: Created complete PostgreSQL schema via Drizzle ORM, deployed to Neon, applied RLS policies and indexes
+
+**What's now complete and where it lives:**
+- 25 Drizzle schema files in `resilientsa-app/src/db/schema/public/` and `coop_pii/`
+- `drizzle.config.ts` — Postgres dialect, Neon connection
+- `src/db/client.ts` — pg Pool + drizzle instance
+- `src/db/index.ts` — combined schema export
+- `drizzle/migrations/0000_fluffy_sabra.sql` — generated migration (313 lines, all 25 tables)
+- `drizzle/migrations/0001_custom_setup.sql` — pgcrypto, coop_pii schema, ALTER TABLE SET SCHEMA, RLS policies, 19 indexes
+- `.env.example` updated with DATABASE_URL + ENCRYPTION_KEY templates
+- Vercel env vars: DATABASE_URL + ENCRYPTION_KEY (production)
+
+**Neon database:**
+- Project: `resilientsa` (PostgreSQL 16, eu-central-1)
+- Neon dashboard: https://console.neon.tech/app/projects
+
+**Verification — all pass:**
+- `coop_pii` schema exists ✅
+- `founding_members.id_number` is `bytea` ✅
+- `users.phone_number` is `bytea` ✅
+- RLS enabled on `listings` (`relrowsecurity: true`) ✅
+- All 25 tables created and FK-constrained ✅
+- All PII fields are bytea: `phone_number`, `whatsapp_number`, `full_name`, `surname`, `address`, `id_number`, `email`, `contact_email` ✅
+
+**What's blocked, and on whom:**
+- Nothing blocked.
+
+**Protocol/pattern checked against:**
+- CREW_ORDERS/CREW-ORDER-003.md — built to exact spec
+- `docs/technical-architecture-v1.0.md` Section 3 — all tables from the authoritative schema reference
+- `docs/cooperative-formation-spec-v1.0.md` Section 9 — Cooperative, FoundingMember, CooperativeStatusEvent
+- `docs/community-marketplace-spec-v1.0.md` Section 8 — ProgrammeOffering, OfferingEngagement, OfferingEndorsement
+- `docs/anticipatory-intelligence-spec-v1.0.md` Sections 4.1 & 6.6 — ExternalSignal, InternalForecast, AnticipatoryAlert, MultiSignalAlert
+- `docs/community-health-protocol-spec-v1.0.md` Section 3 — CommunityHealthAssessment
+
+**Deviations from spec:**
+- `Pillar` enum converted to `const PILLAR` object — same reason as ORDER 002 (TypeScript erasableSyntaxOnly)
+- Custom migration (0001) applied manually via script instead of drizzle-kit migrate — drizzle-kit does not support schema-level DDL (CREATE SCHEMA, RLS, indexes) in its generation pipeline. The schema setup, table moves to coop_pii, RLS policies, and indexes were applied via a custom SQL migration script.
+- Drizzle `pgTable` schema option does not propagate to generated SQL — tables initially created in `public`, then `ALTER TABLE SET SCHEMA coop_pii` applied
+
+**Anything flagged to Worf or Bones:**
+- Worf review filed: `WORF_ALERTS/2026-07-02-order003-schema-review.md` — ALL CLEAR, 5/5 checks pass, signed off
+- Bones: not required (no human-facing output)
+
+**Next:** Awaiting CREW-ORDER-004 (Authentication).
 
 ---
 
