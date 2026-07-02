@@ -1,10 +1,10 @@
 // server/index.ts
 // ResilientSA Express API server
-// Env vars loaded via -r dotenv/config preload
 
 import express from 'express'
 import cors from 'cors'
 import authRoutes from './routes/auth'
+import giftsRouter from './routes/gifts'
 import { requireSession } from './middleware/session'
 
 const app = express()
@@ -18,6 +18,9 @@ app.use('/auth', authRoutes)
 
 // Protected routes — all require valid session token
 app.use('/api', requireSession)
+
+// Gifts profile
+app.use('/gifts-profile', giftsRouter)
 
 // Health check
 app.get('/api/me', (req, res) => {

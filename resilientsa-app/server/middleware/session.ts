@@ -3,6 +3,9 @@ import { db } from '../../src/db/client'
 import { sessionTokens } from '../../src/db/schema/public/session-tokens'
 import { users } from '../../src/db/schema/public/users'
 import { eq, and, gt } from 'drizzle-orm'
+import { withRLSContext } from '../lib/db-context'
+
+export { withRLSContext }
 
 export async function requireSession(req: Request, res: Response, next: NextFunction) {
   const token = req.headers.authorization?.replace('Bearer ', '')
@@ -32,12 +35,12 @@ export async function requireSession(req: Request, res: Response, next: NextFunc
     return
   }
 
-  // Attach session context to request for downstream use
-  // RLS context (SET LOCAL app.current_node_id/role) will be set at
-  // the db client level in a future order — requires per-connection config
+  // Attach session context and RLS helper to request
   ;(req as any).userId   = session.userId
   ;(req as any).userRole = session.role
   ;(req as any).nodeId   = session.nodeId
+  ;(req as any).withRLS  = <T>(fn: () => Promise<T>) =>
+    withRLSContext(session.nodeId!, session.role!, fn)
 
   next()
 }

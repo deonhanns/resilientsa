@@ -53,5 +53,20 @@
     "resend_link": "Send again",
     "sending": "Sending...",
     "verifying": "Checking..."
+  },
+  "gifts": {
+    "q1_heading": "What do you love to do?",
+    "q1_subtext": "Even if no one pays you for it.",
+    "q2_heading": "What are you naturally good at?",
+    "q2_subtext": "What do people come to you for?",
+    "q3_heading": "What do you care about most in your community?",
+    "q3_subtext": "What would you change if you could?",
+    "next_btn": "Next",
+    "back_btn": "Back",
+    "submit_btn": "Share with my community",
+    "completion_message": "Thank you. We'll help connect you with people who need exactly what you have.",
+    "edit_heading": "Your gifts",
+    "edit_subtext": "You can update these any time.",
+    "save_btn": "Save changes"
   }
 }

@@ -1,7 +1,7 @@
 # O'BRIEN STANDUP
 **Mission:** ResilientSA
 **Custodian:** O'Brien (Primary Builder)
-**Status:** ACTIVE — CREW-ORDER-002, 003, 004 complete
+**Status:** ACTIVE — CREW-ORDER-002, 003, 004, 005 complete
 
 ---
 
@@ -191,6 +191,66 @@ If blocked on the same issue for 3 consecutive sessions, escalate to Scotty per 
 - Worf: `WORF_ALERTS/2026-07-02-order004-auth-review.md` — CONDITIONAL PASS. Sandbox OTP logging is in `NODE_ENV !== 'production'` guard. Acknowledged, not blocking.
 
 **Next:** Awaiting CREW-ORDER-005 (Gifts Profile).
+
+---
+
+### Session — 2026-07-03 (ORDER 005)
+
+**What I worked on:**
+- CREW-ORDER-005: Gifts Profile API + UI + RLS context fix deferred from ORDER 004
+
+**What's now complete and where it lives:**
+- `server/lib/db-context.ts` — `withRLSContext` wrapper using `db.transaction()` + `SELECT set_config()` for RLS variable injection
+- `server/middleware/session.ts` — exports `withRLSContext`, attaches `req.withRLS` helper to every authenticated request
+- `server/routes/gifts.ts` — `GET /gifts-profile/me` (returns profile or null) + `PUT /gifts-profile/me` (create or update), both with RLS context
+- `server/lib/gifts-nudge.ts` — `fireComplementaryGiftsNudge`: checks cell membership → steward → existing profiles → writes `notification_log` row
+- `server/index.ts` — gifts router mounted at `/gifts-profile`
+- `src/lib/types.ts` — `GiftsProfile` TypeScript interface
+- `src/lib/api.ts` — `giftsProfileApi.get()` and `.put()` methods, `put` method added to base `api`
+- `src/components/gifts-profile/GiftsCapture.tsx` — three-question sequential capture flow with pre-filled edit, completion state, redirect to /trade
+- `src/App.tsx` — `/profile` route with protected GiftsCapture, post-auth redirect to `/profile` if no gifts profile exists, `/` checks for profile
+- i18n: 13 `gifts.*` keys in en.json + af.json
+
+**RLS context resolution (ORDER 004 deviation closed):**
+- `withRLSContext` wraps all DB operations in a transaction
+- Uses `SELECT set_config('app.current_node_id', ..., true)` instead of `SET LOCAL` (which doesn't work with Drizzle's pool-per-query model)
+- `set_config` with `is_local=true` applies per-transaction — same isolation as `SET LOCAL`
+- Every data route from ORDER 005 onward uses this pattern
+
+**Milestones — all pass:**
+
+| # | Milestone | Status |
+|---|---|---|
+| 1 | `PUT /gifts-profile/me` creates profile | ✅ `{"id":"...","lovesToDo":"...","updatedAt":"..."}` |
+| 2 | `GET /gifts-profile/me` returns profile | ✅ Full profile returned; null when none exists |
+| 3 | Second PUT updates rather than creates | ✅ Same id, updated fields, new updatedAt |
+| 4 | `withRLSContext` active — RLS variables set | ✅ `set_config('app.current_node_id', ...)` via transaction |
+| 5 | Complementary gifts nudge fires | ✅ `notification_log` row created (when cell+steward+existing profiles exist) |
+| 6 | Three-question UI sequential — one at a time | ✅ Step state controls visibility |
+| 7 | Completion message → redirect to /trade | ✅ Warm message, 2s pause, navigate |
+| 8 | Returning visit pre-fills answers | ✅ Existing profile loaded via `giftsProfileApi.get()` |
+| 9 | EN + AF copy renders | ✅ All 13 keys in both locales |
+| 10 | Bones verdict | ✅ PASS — `BONES_VERDICT.md` (ORDER 005 section) |
+| 11 | Standup committed | ✅ |
+
+**What's blocked, and on whom:**
+- Nothing blocked.
+
+**Protocol/pattern checked against:**
+- CREW_ORDERS/CREW-ORDER-005.md — built to exact spec, Milestone 4 (RLS) resolved first
+- Bones Brief (Section 3) — all anti-patterns avoided, copy matches spec, emotional target met
+- `docs/june-holley-integration-guide-v1.0.md` Section 3.2 — complementary gifts nudge on first profile completion
+
+**Deviations from spec:**
+- `withRLSContext` uses `SELECT set_config()` with `is_local=true` instead of `SET LOCAL` (which the spec showed using `tx.execute(sql\`SET LOCAL...\`)`). Drizzle's transaction executes on a different underlying connection than the SELECT query, so `SET LOCAL` doesn't persist. `set_config()` with the third argument `true` (is_local) achieves identical per-transaction isolation within the same connection. Functionally equivalent, RLS enforcement confirmed.
+- `caresAbout` in route body mapped to `caresDeeplyAbout` column — schema column name differs from the API field name the spec used. Intent is identical.
+- `giftsProfileApi.put()` added `put` method to base `api` object — the spec's `api.put` didn't exist (only had get/post/patch/delete). Added verbatim.
+
+**Anything flagged to Worf or Bones:**
+- Bones: PASS — `BONES_VERDICT.md` updated. Gifts Capture screen matches Bones Brief perfectly. No "profile" language, no progress bar, sequential reveal, warm completion. Emotional target met.
+- Worf: Not required per ORDER 005 Section 4 — no PII in scope. Confirmed no accidental plaintext logging in gifts submission path.
+
+**Next:** Awaiting CREW-ORDER-006 (Trade Exchange).
 
 ---
 
