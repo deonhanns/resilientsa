@@ -25,7 +25,13 @@
     "share_title": "Share with your cell",
     "im_offering": "I'm offering",
     "i_need_help": "I need help",
-    "post_to_cell": "Post to the cell"
+    "what_offering": "What are you offering?",
+    "what_needing": "What do you need?",
+    "post_to_cell": "Post to the cell",
+    "empty_cell": "Be the first to offer something",
+    "empty_offer": "Nothing here yet in this filter.",
+    "pending_sync": "Waiting to sync",
+    "no_cell_yet": "Your Cell Steward will add you to a cell soon"
   },
   "support": {
     "title": "Get support",

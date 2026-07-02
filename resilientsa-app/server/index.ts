@@ -5,6 +5,7 @@ import express from 'express'
 import cors from 'cors'
 import authRoutes from './routes/auth'
 import giftsRouter from './routes/gifts'
+import listingsRouter from './routes/listings'
 import { requireSession } from './middleware/session'
 
 const app = express()
@@ -21,6 +22,9 @@ app.use('/api', requireSession)
 
 // Gifts profile
 app.use('/gifts-profile', giftsRouter)
+
+// Listings, matches, trade completions, exchange reference
+app.use('/', listingsRouter)
 
 // Health check
 app.get('/api/me', (req, res) => {

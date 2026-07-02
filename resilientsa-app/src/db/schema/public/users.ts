@@ -20,6 +20,7 @@ export const users = pgTable('users', {
   nodeId:            uuid('node_id').notNull().references(() => nodes.id),
   cellId:            uuid('cell_id'),
   displayName:       text('display_name').notNull(),
+  phoneHash:         text('phone_hash'),
   phoneNumber:       bytea('phone_number'),
   role:              text('role', {
                        enum: ['member','cell_steward','node_admin','regional_steward']

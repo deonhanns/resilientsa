@@ -60,10 +60,11 @@ router.post('/verify-code', async (req: Request, res: Response) => {
 
   const encryptedPhone = encryptPhone(normalised)
 
+  // Look up by deterministic phoneHash — encrypted phone changes per IV
   let userRows = await db
     .select()
     .from(users)
-    .where(eq(users.phoneNumber, encryptedPhone))
+    .where(eq(users.phoneHash, phoneHash))
     .limit(1)
 
   let user = userRows[0]
@@ -73,13 +74,20 @@ router.post('/verify-code', async (req: Request, res: Response) => {
       .insert(users)
       .values({
         displayName:       'Community member',
-        nodeId:            '00000000-0000-0000-0000-000000000001', // default node
+        nodeId:            '00000000-0000-0000-0000-000000000001',
+        phoneHash:         phoneHash,
         phoneNumber:       encryptedPhone,
         role:              'member',
         preferredLanguage: preferred_language ?? 'en',
       })
       .returning()
     user = inserted
+  } else {
+    // Update encrypted phone on each login (re-encrypt with fresh IV)
+    await db
+      .update(users)
+      .set({ phoneNumber: encryptedPhone })
+      .where(eq(users.id, user.id))
   }
 
   const sessionToken = randomUUID()
