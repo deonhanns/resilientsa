@@ -1,5 +1,5 @@
 # ResilientSA — Bones Protocol
-## Bridge Document | Version 1.0
+## Bridge Document | Version 1.1
 *Formalises the design gate for all human-facing builds. Extends CREW_MANIFEST.md Studio section.*
 
 ---
@@ -8,7 +8,7 @@
 
 Bones (McCoy) is not a crew member who lives in VS Code. Bones is a **design gate** — a structured review invoked before any human-facing build begins or merges. The gate returns a verdict. It does not converse, iterate, or advise. It passes or it flags.
 
-This document formalises the protocol for ResilientSA specifically: when it is invoked, what the brief to Claude Design looks like, what the five-question test evaluates against, and what the output requires.
+This document formalises the protocol for ResilientSA specifically: when it is invoked, what the brief to Claude Design looks like, what the six-question test evaluates against, and what the output requires.
 
 ---
 
@@ -31,9 +31,9 @@ Bones is invoked whenever a Crew Order produces, or requires as a dependency, an
 
 ---
 
-## 3. The Five-Question Bones Test
+## 3. The Six-Question Bones Test
 
-Every Bones review runs five questions against the work being reviewed. These are not a checklist — they are the lens Bones applies to produce a verdict.
+Every Bones review runs six questions against the work being reviewed. These are not a checklist — they are the lens Bones applies to produce a verdict.
 
 **Q1 — Is it human?**
 Does this feel like it was made by a person who cares about the person receiving it? Or does it feel generated, templated, corporate, or NGO-generic? The platform's warm, grounded, non-institutional tone (Mission Brief Section 2.5, Brand Identity System) must be present in every human-facing element.
@@ -49,6 +49,11 @@ ResilientSA's Cell Stewards are volunteers doing this work on top of already dem
 
 **Q5 — Does it respect the community member's time and dignity?**
 No dark patterns. No false urgency. No guilt. No nudges that exploit psychological pressure. Nothing that treats the person as a data source rather than a human being. The platform is in service of communities; communities are not in service of the platform.
+
+**Q6 — Does it communicate without relying on text?**
+South Africa has 11 official languages. ResilientSA serves communities where English is not a home language and where literacy varies. Cover the text on the screen — does the person still know what pillar they're looking at, what state a listing is in, what action is available? Pillar colours, icons, and visual hierarchy must carry meaning independently of the text label. If the design fails when the text is removed, it fails this question.
+
+This is not about making text optional — text matters and all UI strings are translated into Afrikaans at MVP (isiZulu at Phase 2). This is about ensuring the visual layer does its own work so that language and literacy are lower barriers, not higher ones. The Cell Steward is the human language bridge for their community — the platform's job is to make the Steward's job easier, not to require the Steward to explain every screen.
 
 **ResilientSA-specific addition to Q2 and Q4:** because Cape Town communities specifically have been through development theatre and are evidence-based and tired of empty promises (Captain's direction, 2026-06-30 Bridge session), anything that feels like a pitch rather than a working tool — even if technically functional — fails the test. The platform earns trust by working, not by presenting well.
 
@@ -87,6 +92,11 @@ Brand references:
 Pillar context (if applicable):
 [Which pillar(s) does this build serve? What does the pillar
  colour signal in this context?]
+
+Language context:
+[Which languages does this build serve at review time?
+ English only / English + Afrikaans / English + Afrikaans + isiZulu.
+ Bones reviews all populated language versions, not English alone.]
 ```
 
 ---
@@ -99,6 +109,7 @@ Every Bones review produces a `BONES_VERDICT.md` committed to the repo root. If 
 # BONES VERDICT
 **Date:** [date]
 **Build:** [Crew Order ID + what was reviewed]
+**Languages reviewed:** [e.g. English + Afrikaans]
 **Status:** PASS / CONDITIONAL PASS / FAIL
 
 ---
@@ -117,6 +128,11 @@ Every Bones review produces a `BONES_VERDICT.md` committed to the repo root. If 
 
 ## Q5 — Does it respect time and dignity?
 [Assessment]
+
+## Q6 — Does it communicate without relying on text?
+[Assessment — describe what the screen communicates with text
+ covered. Name specific elements that carry or fail to carry
+ meaning visually.]
 
 ---
 
@@ -199,6 +215,8 @@ Anti-patterns to avoid:
   tech scene rather than Cape Town's communities
 - Any onboarding or sign-up gate before the person can see
   the actual product
+- Any design that communicates meaning only through text —
+  pillar colour and icon must carry the meaning independently
 
 Brand references:
 docs/brand-palette-v1.0.md — full Living Soil palette.
@@ -212,6 +230,11 @@ visible and immediately understandable as the organising
 structure — without explaining what a "pillar" is. The visual
 design carries the meaning; the word "pillar" may not appear
 at all in the prototype.
+
+Language context:
+English only for the prototype review. Afrikaans translations
+are wired in ORDER 002 — Bones reviews both language versions
+from ORDER 004 onward when real copy exists.
 ```
 
 ---
@@ -226,6 +249,8 @@ at all in the prototype.
 
 **One verdict per build, not per session.** If O'Brien makes a significant change to a human-facing element during the build that was not in the original Bones-reviewed design, a new invocation is required — not a check-in, not a verbal approval.
 
+**Language versioning:** from ORDER 004 onward, Bones reviews all populated language versions — not English alone. A design that passes in English but fails in Afrikaans is a CONDITIONAL PASS with Afrikaans corrections required before merge.
+
 ---
 
-*ResilientSA Bones Protocol v1.0 | Bridge Document | Formalises CREW_MANIFEST.md Studio section | For Bridge, Studio, and Engine Room Use*
+*ResilientSA Bones Protocol v1.1 | Bridge Document | Updated: six-question test, Q6 Visual Language Independence, language versioning in verdict format | For Bridge, Studio, and Engine Room Use*
