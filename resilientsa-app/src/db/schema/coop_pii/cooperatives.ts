@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, date } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, date } from 'drizzle-orm/pg-core'
 import { nodes } from '../public/nodes'
 
 export const cooperatives = pgTable('cooperatives', {

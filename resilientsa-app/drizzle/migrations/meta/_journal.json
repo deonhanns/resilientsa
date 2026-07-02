@@ -8,6 +8,13 @@
       "when": 1783002793587,
       "tag": "0000_fluffy_sabra",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783029184125,
+      "tag": "0001_safe_thanos",
+      "breakpoints": true
     }
   ]
 }

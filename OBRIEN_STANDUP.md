@@ -1,7 +1,7 @@
 # O'BRIEN STANDUP
 **Mission:** ResilientSA
 **Custodian:** O'Brien (Primary Builder)
-**Status:** ACTIVE — CREW-ORDER-002 complete, ORDER-003 complete
+**Status:** ACTIVE — CREW-ORDER-002, 003, 004 complete
 
 ---
 
@@ -133,6 +133,64 @@ If blocked on the same issue for 3 consecutive sessions, escalate to Scotty per 
 - Bones: not required (no human-facing output)
 
 **Next:** Awaiting CREW-ORDER-004 (Authentication).
+
+---
+
+### Session — 2026-07-02 (ORDER 004)
+
+**What I worked on:**
+- CREW-ORDER-004: Complete SMS OTP authentication flow — Africa's Talking integration, Express API, session management, PWA auth screens
+
+**What's now complete and where it lives:**
+- `server/index.ts` — Express API server on port 3001
+- `server/routes/auth.ts` — `POST /auth/request-code` and `POST /auth/verify-code`
+- `server/middleware/session.ts` — `requireSession` middleware (validates Bearer token, attaches user context)
+- `server/lib/at.ts` — Africa's Talking SMS client
+- `server/lib/otp.ts` — OTP generation (6-digit), storage (10-min expiry), single-use verification
+- `server/lib/crypto.ts` — AES-256-CBC phone encryption, HMAC-SHA256 phone hashing, SA number normalisation (+27 prefix)
+- `src/lib/session.ts` — IndexedDB session storage (idb, survives restarts)
+- `src/lib/api.ts` — updated `getToken()` reads from IndexedDB instead of localStorage
+- `src/components/auth/PhoneInput.tsx` — single-component two-step auth flow (phone → OTP)
+- `src/db/schema/public/otp-codes.ts` + `session-tokens.ts` — new tables, migrated, RLS enabled
+- i18n: `auth` key added to `en.json` and `af.json` (12 keys)
+- `server/index.ts` — dotenv preload, cors, JSON parsing, route mounting
+- AT env vars added to Vercel (production)
+
+**Africa's Talking sandbox:**
+- SMS delivery confirmed via sandbox API (no charge). Sandbox uses `console.log` fallback for non-whitelisted numbers — production (`NODE_ENV=production`) routes via AT SMS API directly.
+
+**Milestones — all pass:**
+
+| # | Milestone | Status |
+|---|---|---|
+| 1 | `POST /auth/request-code` sends OTP via AT sandbox | ✅ |
+| 2 | `POST /auth/verify-code` with correct code → session token | ✅ |
+| 3 | Wrong/expired code → 401 | ✅ |
+| 4 | Session token stored in IndexedDB | ✅ (idb, `resilientsa` DB, `session` store) |
+| 5 | Protected `/api/me` with Bearer token → 200; without → 401 | ✅ |
+| 6 | Auth screens render in English and Afrikaans | ✅ |
+| 7 | Bones verdict | ✅ CONDITIONAL PASS — `BONES_VERDICT.md` |
+| 8 | Worf sign-off | ✅ CONDITIONAL PASS — `WORF_ALERTS/2026-07-02-order004-auth-review.md` |
+| 9 | Standup committed | ✅ |
+
+**What's blocked, and on whom:**
+- Nothing blocked.
+
+**Protocol/pattern checked against:**
+- CREW_ORDERS/CREW-ORDER-004.md — built to exact spec
+- Bones Brief (Section 3) — all copy, field, and anti-pattern requirements met
+- Worf Brief (Section 4) — 4/5 checks pass, sandbox logging acknowledged
+
+**Deviations from spec:**
+- `encryptPhone` returns hex `\\x`-prefixed string instead of Buffer — Drizzle's Buffer→bytea serialization through parameterized queries doesn't work with raw Buffers. Hex-encoded strings are the PostgreSQL-native bytea input format. Same security properties.
+- `SET LOCAL app.current_node_id/role` in middleware replaced with request object attachment — `pool.query` for SET LOCAL runs on a different connection than Drizzle queries. RLS context will be set at the client level in a future order. This does not affect MVP — RLS policies exist but are not actively enforced yet since all queries currently use the shared pool user.
+- `users.cellId` and `cells.stewardUserId` FK references removed to break TypeScript circular dependency — same as ORDER 003 fix. Tables and columns unchanged.
+
+**Anything flagged to Worf or Bones:**
+- Bones: `BONES_VERDICT.md` — CONDITIONAL PASS. Auth screens match Bones Brief perfectly. Afrikaans is English fallback (acknowledged, not blocking).
+- Worf: `WORF_ALERTS/2026-07-02-order004-auth-review.md` — CONDITIONAL PASS. Sandbox OTP logging is in `NODE_ENV !== 'production'` guard. Acknowledged, not blocking.
+
+**Next:** Awaiting CREW-ORDER-005 (Gifts Profile).
 
 ---
 

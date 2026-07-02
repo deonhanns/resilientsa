@@ -1,11 +1,5 @@
-import { pgTable, uuid, text, timestamp, customType } from 'drizzle-orm/pg-core'
-import { users } from './users'
-
-const bytea = customType<{ data: string; driverData: Buffer }>({
-  dataType() { return 'bytea' },
-  toDriver(value: string): Buffer { return Buffer.from(value, 'utf-8') },
-  fromDriver(value: Buffer): string { return value.toString('utf-8') },
-})
+import { pgTable, uuid, text, timestamp } from 'drizzle-orm/pg-core'
+import { users, bytea } from './users'
 
 export const grounders = pgTable('grounders', {
   id:                 uuid('id').primaryKey().defaultRandom(),

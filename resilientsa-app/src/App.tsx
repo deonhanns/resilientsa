@@ -1,8 +1,10 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ALL_PILLARS, PILLAR_LABELS } from './lib/pillars'
+import { getSession } from './lib/session'
+import { useEffect, useState } from 'react'
+import PhoneInput from './components/auth/PhoneInput'
 
-// ORDER 002 verification: log ALL_PILLARS on mount
 console.log('ORDER 002 VERIFY — ALL_PILLARS:', ALL_PILLARS)
 console.log('ORDER 002 VERIFY — PILLAR_LABELS:', PILLAR_LABELS)
 
@@ -14,7 +16,6 @@ function HomePage() {
 
   return (
     <div className="min-h-screen p-4" style={{ backgroundColor: 'var(--canvas)' }}>
-      {/* Tailwind utility check: bg-pillar-water should be #3D6B8C */}
       <div className="bg-pillar-water text-white p-4 rounded-lg mb-4">
         <h1 className="font-heading text-lg font-bold">
           Community Hub — ORDER 002 scaffold
@@ -24,7 +25,6 @@ function HomePage() {
         </p>
       </div>
 
-      {/* CSS token check: --pillar-health should be #B24C63 */}
       <div
         className="p-4 rounded-lg mb-4 text-white"
         style={{ backgroundColor: 'var(--pillar-health)' }}
@@ -34,7 +34,6 @@ function HomePage() {
         </p>
       </div>
 
-      {/* i18n check */}
       <div className="bg-white p-4 rounded-lg border border-gray-200">
         <p className="font-body text-sm" style={{ color: 'var(--bark-900)' }}>
           i18n check — nav.exchange: <strong>{t('nav.exchange')}</strong>
@@ -47,11 +46,42 @@ function HomePage() {
   )
 }
 
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const [authed, setAuthed] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    getSession().then((s) => setAuthed(!!s))
+  }, [])
+
+  if (authed === null) return null // loading
+  if (!authed) return <Navigate to="/join" replace />
+  return <>{children}</>
+}
+
+function JoinPage() {
+  const [role, setRole] = useState<string | null>(null)
+  const authed = !!role
+
+  if (authed) {
+    return <Navigate to="/" replace />
+  }
+
+  return <PhoneInput onSuccess={(r) => setRole(r)} />
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/"        element={<HomePage />} />
+        <Route path="/join" element={<JoinPage />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <HomePage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/trade"   element={<div>Trade Exchange — ORDER 006</div>} />
         <Route path="/support" element={<div>Community Marketplace — ORDER 008</div>} />
         <Route path="/profile" element={<div>Gifts Profile — ORDER 005</div>} />
