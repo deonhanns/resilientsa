@@ -1,0 +1,34 @@
+<!-- @dsCard group="Components" viewport="700x420" name="ListingCard & ProgrammeCard" subtitle="Trade Exchange listings and Marketplace offerings" -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  body { margin: 0; background: var(--canvas); color: var(--text-primary); font-family: var(--font-body); padding: 22px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; max-width: 720px; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script type="text/babel">
+    const { ListingCard, ProgrammeCard } = window.ResilientSALivingSoilDesignSystem_6bdfdd;
+    ReactDOM.createRoot(document.getElementById('root')).render(
+      <div className="grid">
+        <ListingCard kind="offer" pillar="food" title="Spare tomato seedlings" member="Nomsa" place="Cell 4" />
+        <ListingCard kind="need" pillar="water" title="Help fixing a shared tap" member="Themba" place="Cell 4" steward />
+        <ProgrammeCard pillar="water" title="Fix a broken communal tap"
+          summary="A plumber trains two people from your area to repair and maintain shared taps."
+          communitiesCount={38} provider="Cape Water Collective" />
+        <ProgrammeCard pillar="safety" title="Set up a neighbourhood watch"
+          summary="Practical help to start a watch group that works with your local CPF."
+          communitiesCount={51} provider="Safer Streets Trust" />
+      </div>
+    );
+  </script>
+</body>
+</html>

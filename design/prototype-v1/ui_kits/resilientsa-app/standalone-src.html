@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ResilientSA — Living Soil prototype</title>
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: radial-gradient(120% 90% at 50% 0%, #EFEDE8 0%, #E2DCD2 100%);
+    font-family: var(--font-body);
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 20px; box-sizing: border-box;
+  }
+  .device {
+    width: 390px; height: 780px; max-height: calc(100vh - 40px);
+    background: var(--bg-page); border-radius: 40px;
+    box-shadow: 0 2px 4px rgba(44,42,41,.1), 0 30px 60px rgba(44,42,41,.22);
+    border: 10px solid #22201F; overflow: hidden; position: relative;
+  }
+  .notch {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 130px; height: 26px; background: #22201F;
+    border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; z-index: 60;
+  }
+  #app { height: 100%; }
+  @keyframes resaToast { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  @keyframes resaFade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes resaSheet { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  ::-webkit-scrollbar { width: 0; height: 0; }
+</style>
+</head>
+<body>
+  <template id="__bundler_thumbnail" data-bg-color="#E7E7E2">
+    <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+      <rect width="1200" height="800" fill="#E7E7E2"/>
+      <g transform="translate(600 380)" fill="none" stroke="#2C2A29" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M-150 40 q0 90 150 90 q150 0 150 -90" fill="#4A7256" stroke="none"/>
+        <path d="M-150 40 q0 90 150 90 q150 0 150 -90"/>
+        <path d="M0 40 v-150"/>
+        <path d="M0 -60 q-70 -10 -85 -80 q75 0 85 80z" fill="#4A7256" stroke="#2C2A29"/>
+        <path d="M0 -30 q70 -10 85 -80 q-75 0 -85 80z" fill="#C85A3C" stroke="#2C2A29"/>
+      </g>
+      <text x="600" y="600" font-family="Ubuntu, sans-serif" font-size="64" font-weight="700" fill="#2C2A29" text-anchor="middle">ResilientSA</text>
+    </svg>
+  </template>
+  <div class="device">
+    <div class="notch"></div>
+    <div id="app"></div>
+  </div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script src="data.js"></script>
+  <script type="text/babel" src="TradeExchange.jsx"></script>
+  <script type="text/babel" src="Marketplace.jsx"></script>
+  <script type="text/babel" src="StewardDashboard.jsx"></script>
+  <script type="text/babel" src="App.jsx"></script>
+  <script type="text/babel" data-presets="react">
+    function mount() {
+      if (!window.RESA_App) { setTimeout(mount, 30); return; }
+      ReactDOM.createRoot(document.getElementById('app')).render(<window.RESA_App />);
+    }
+    mount();
+  </script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!-- @dsCard group="Components" viewport="700x220" name="AppBar & BottomNav" subtitle="Phone chrome — top bar and icon-first bottom navigation" -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  body { margin: 0; background: var(--canvas); color: var(--text-primary); font-family: var(--font-body); padding: 22px; }
+  .phone { max-width: 380px; border: 1px solid var(--border-hairline); border-radius: var(--radius-lg); overflow: hidden; background: var(--bg-page); box-shadow: var(--shadow-card); }
+  .body { height: 90px; background: var(--canvas-sunk); }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script type="text/babel">
+    const { AppBar, BottomNav, IconButton } = window.ResilientSALivingSoilDesignSystem_6bdfdd;
+    function Demo() {
+      const [tab, setTab] = React.useState('exchange');
+      return (
+        <div className="phone">
+          <AppBar title="Trade Exchange" trailing={<IconButton icon="bell" label="Alerts" />} />
+          <div className="body" />
+          <BottomNav active={tab} onChange={setTab} items={[
+            { key:'exchange', label:'Exchange', icon:'home' },
+            { key:'support',  label:'Support',  icon:'hand-heart' },
+            { key:'steward',  label:'Steward',  icon:'users' },
+          ]} />
+        </div>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+  </script>
+</body>
+</html>

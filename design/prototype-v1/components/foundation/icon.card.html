@@ -1,0 +1,50 @@
+<!-- @dsCard group="Components" viewport="700x260" name="Icon — line glyph set" subtitle="Six pillar glyphs + UI icons, 1.75 stroke" -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  body { margin: 0; background: var(--canvas); color: var(--text-primary); font-family: var(--font-body); padding: 22px; }
+  .grp { margin-bottom: 18px; }
+  .lbl { font: var(--role-caption); color: var(--text-muted); text-transform: uppercase; letter-spacing: var(--tracking-wide); margin-bottom: 10px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, 64px); gap: 12px; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .cell .cap { font: var(--role-caption); font-size: 10px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script type="text/babel">
+    const { Icon } = window.ResilientSALivingSoilDesignSystem_6bdfdd;
+    const pillars = ['water','food','health','safety','energy','skills'];
+    const ui = ['plus','search','arrow-left','arrow-right','check','bell','users','map-pin','filter','chevron-right','x','hand-heart','user-round','circle-alert','sprout','home','message-circle','clock','circle-check'];
+    const Cell = ({n, c}) => (
+      <div className="cell"><Icon name={n} size={26} color={c} /><span className="cap">{n}</span></div>
+    );
+    ReactDOM.createRoot(document.getElementById('root')).render(
+      <div>
+        <div className="grp">
+          <div className="lbl">Six pillars — colour carries meaning</div>
+          <div className="grid">
+            <Cell n="water" c="var(--pillar-water)" />
+            <Cell n="food" c="var(--pillar-food)" />
+            <Cell n="health" c="var(--pillar-health)" />
+            <Cell n="safety" c="var(--pillar-safety)" />
+            <Cell n="energy" c="var(--pillar-energy)" />
+            <Cell n="skills" c="var(--pillar-skills)" />
+          </div>
+        </div>
+        <div className="grp">
+          <div className="lbl">Interface glyphs — Baobab Bark</div>
+          <div className="grid">{ui.map(n => <Cell key={n} n={n} />)}</div>
+        </div>
+      </div>
+    );
+  </script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+<!-- @dsCard group="Colors" viewport="700x200" name="Living Soil pillar hues" subtitle="Six earth hues — one per pillar, each carries meaning. Never invent new ones." -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; background: var(--canvas); color: var(--text-primary); font-family: var(--font-body); padding: 22px; }
+  .row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  .sw { border-radius: var(--radius-md); border: 1px solid var(--border-hairline); overflow: hidden; }
+  .chip { height: 60px; display: flex; align-items: flex-end; padding: 7px; }
+  .tint { width: 24px; height: 24px; border-radius: 6px; border: 1px solid rgba(0,0,0,.08); }
+  .meta { padding: 8px 9px; background: var(--surface-card); }
+  .nm { font: var(--role-label); font-size: 13px; }
+  .hx { font: var(--role-caption); font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .pl { font: var(--role-caption); font-size: 11px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="sw"><div class="chip" style="background:#3D6B8C"><span class="tint" style="background:var(--rain-tint)"></span></div><div class="meta"><div class="pl">Water</div><div class="nm">Rainwater Blue</div><div class="hx">#3D6B8C</div></div></div>
+    <div class="sw"><div class="chip" style="background:#4A7256"><span class="tint" style="background:var(--aloe-tint)"></span></div><div class="meta"><div class="pl">Food</div><div class="nm">Fynbos Aloe</div><div class="hx">#4A7256</div></div></div>
+    <div class="sw"><div class="chip" style="background:#B24C63"><span class="tint" style="background:var(--protea-tint)"></span></div><div class="meta"><div class="pl">Health</div><div class="nm">Protea Rose</div><div class="hx">#B24C63</div></div></div>
+    <div class="sw"><div class="chip" style="background:#C85A3C"><span class="tint" style="background:var(--ochre-tint)"></span></div><div class="meta"><div class="pl">Safety</div><div class="nm">Ochre Earth</div><div class="hx">#C85A3C</div></div></div>
+    <div class="sw"><div class="chip" style="background:#E6A854"><span class="tint" style="background:var(--clay-tint)"></span></div><div class="meta"><div class="pl">Energy</div><div class="nm">Sunbaked Clay</div><div class="hx">#E6A854</div></div></div>
+    <div class="sw"><div class="chip" style="background:#5E5A8C"><span class="tint" style="background:var(--indigo-tint)"></span></div><div class="meta"><div class="pl">Skills & Trade</div><div class="nm">Indigo Cloth</div><div class="hx">#5E5A8C</div></div></div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!-- @dsCard group="Colors" viewport="700x160" name="State signals" subtitle="Meaning mapped to hue — success, urgent, pending, info" -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; background: var(--canvas); color: var(--text-primary); font-family: var(--font-body); padding: 22px; }
+  .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .cell { border-radius: var(--radius-md); padding: 14px; border: 1px solid var(--border-hairline); }
+  .dot { width: 14px; height: 14px; border-radius: 50%; margin-bottom: 10px; }
+  .nm { font: var(--role-label); }
+  .sub { font: var(--role-caption); color: var(--text-muted); margin-top: 2px; }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="cell" style="background:var(--aloe-tint)"><div class="dot" style="background:var(--signal-success)"></div><div class="nm">Success</div><div class="sub">Fynbos Aloe · matched, done</div></div>
+    <div class="cell" style="background:var(--ochre-tint)"><div class="dot" style="background:var(--signal-urgent)"></div><div class="nm">Urgent</div><div class="sub">Ochre Earth · crisis, alert</div></div>
+    <div class="cell" style="background:var(--clay-tint)"><div class="dot" style="background:var(--signal-pending)"></div><div class="nm">Pending</div><div class="sub">Sunbaked Clay · waiting</div></div>
+    <div class="cell" style="background:var(--rain-tint)"><div class="dot" style="background:var(--signal-info)"></div><div class="nm">Info</div><div class="sub">Rainwater Blue · navigation</div></div>
+  </div>
+</body>
+</html>

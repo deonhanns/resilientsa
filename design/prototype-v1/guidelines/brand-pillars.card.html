@@ -1,0 +1,43 @@
+<!-- @dsCard group="Brand" viewport="700x230" name="The Six Pillars" subtitle="Colour + icon carry meaning without text. Never invent new ones." -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; background: var(--canvas); color: var(--text-primary); font-family: var(--font-body); padding: 22px; }
+  .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  .p { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+  .disc { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--canvas); }
+  .nm { font: var(--role-label); }
+  .mn { font: var(--role-caption); color: var(--text-muted); }
+</style>
+</head>
+<body>
+  <div id="root" class="grid"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+  <script src="../_ds_bundle.js"></script>
+  <script type="text/babel">
+    const { Icon } = window.ResilientSALivingSoilDesignSystem_6bdfdd;
+    const P = [
+      ['water','Water','var(--pillar-water)','the tap, the rain'],
+      ['food','Food','var(--pillar-food)','the garden, the meal'],
+      ['health','Health','var(--pillar-health)','the clinic, the carer'],
+      ['safety','Safety','var(--pillar-safety)','the watch, the alert'],
+      ['energy','Energy','var(--pillar-energy)','the light, the power'],
+      ['skills','Skills & Trade','var(--pillar-skills)','the hands, the work'],
+    ];
+    ReactDOM.createRoot(document.getElementById('root')).render(
+      <>{P.map(([ic,nm,c,mn]) => (
+        <div className="p" key={ic}>
+          <div className="disc" style={{background:c}}><Icon name={ic} size={30} /></div>
+          <div className="nm">{nm}</div>
+          <div className="mn">{mn}</div>
+        </div>
+      ))}</>
+    );
+  </script>
+</body>
+</html>

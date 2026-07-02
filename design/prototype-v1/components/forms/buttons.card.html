@@ -1,0 +1,42 @@
+<!-- @dsCard group="Components" viewport="700x230" name="Button & IconButton" subtitle="Primary, secondary, ghost, urgent · md/lg · icon-only" -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  body { margin: 0; background: var(--canvas); color: var(--text-primary); font-family: var(--font-body); padding: 22px; }
+  .lbl { font: var(--role-caption); color: var(--text-muted); text-transform: uppercase; letter-spacing: var(--tracking-wide); margin: 0 0 10px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script type="text/babel">
+    const { Button, IconButton } = window.ResilientSALivingSoilDesignSystem_6bdfdd;
+    ReactDOM.createRoot(document.getElementById('root')).render(
+      <div>
+        <div className="lbl">Variants</div>
+        <div className="row">
+          <Button variant="primary" icon="plus">Offer something</Button>
+          <Button variant="secondary">Not now</Button>
+          <Button variant="ghost">Skip</Button>
+          <Button variant="urgent" icon="circle-alert">Raise alert</Button>
+        </div>
+        <div className="lbl">Sizes, state & icon buttons</div>
+        <div className="row">
+          <Button variant="primary" size="lg" iconRight="arrow-right">Continue</Button>
+          <Button variant="primary" disabled>Disabled</Button>
+          <IconButton icon="arrow-left" label="Back" variant="soft" />
+          <IconButton icon="bell" label="Alerts" variant="soft" />
+          <IconButton icon="x" label="Close" variant="quiet" />
+        </div>
+      </div>
+    );
+  </script>
+</body>
+</html>

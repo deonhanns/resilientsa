@@ -1,0 +1,36 @@
+<!-- @dsCard group="Brand" viewport="700x220" name="Voice — a trusted neighbour" subtitle="Warm, grounded, plainspoken. Not a tech startup, not an NGO." -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; background: var(--canvas); color: var(--text-primary); font-family: var(--font-body); padding: 22px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .col { border-radius: var(--radius-md); padding: 16px; }
+  .yes { background: var(--aloe-tint); }
+  .no { background: var(--ochre-tint); }
+  .hd { font: var(--role-label); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .yes .hd { color: var(--aloe-deep); }
+  .no .hd { color: var(--ochre-deep); }
+  .q { font: var(--role-body); margin: 0 0 8px; }
+  .no .q { color: var(--bark-600); text-decoration: line-through; text-decoration-color: rgba(168,72,46,.5); }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="col yes">
+      <div class="hd">✓ Say it like a neighbour</div>
+      <p class="q">"What does your cell need this week?"</p>
+      <p class="q">"Someone nearby can help with that."</p>
+      <p class="q">"You offered seedlings. Nomsa wants them."</p>
+    </div>
+    <div class="col no">
+      <div class="hd">✕ Not like a platform</div>
+      <p class="q">"Submit a resource request via the portal."</p>
+      <p class="q">"Leverage your cell's pillar coverage."</p>
+      <p class="q">"Onboarding required to access features."</p>
+    </div>
+  </div>
+</body>
+</html>

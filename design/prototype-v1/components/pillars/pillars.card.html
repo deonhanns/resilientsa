@@ -1,0 +1,42 @@
+<!-- @dsCard group="Components" viewport="700x240" name="PillarTag & PillarButton" subtitle="The pillar marker in tag, glyph, and selector forms" -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  body { margin: 0; background: var(--canvas); color: var(--text-primary); font-family: var(--font-body); padding: 22px; }
+  .lbl { font: var(--role-caption); color: var(--text-muted); text-transform: uppercase; letter-spacing: var(--tracking-wide); margin: 0 0 10px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script type="text/babel">
+    const { PillarTag, PillarButton } = window.ResilientSALivingSoilDesignSystem_6bdfdd;
+    const keys = ['water','food','health','safety','energy','skills'];
+    ReactDOM.createRoot(document.getElementById('root')).render(
+      <div>
+        <div className="lbl">Soft tags</div>
+        <div className="row">{keys.map(k => <PillarTag key={k} pillar={k} />)}</div>
+        <div className="lbl">Solid & glyph</div>
+        <div className="row">
+          <PillarTag pillar="safety" variant="solid" />
+          <PillarTag pillar="water" variant="solid" />
+          {keys.map(k => <PillarTag key={k} pillar={k} variant="glyph" />)}
+        </div>
+        <div className="lbl">Selector buttons</div>
+        <div className="row" style={{gap: 12}}>
+          <div style={{width: 96}}><PillarButton pillar="water" /></div>
+          <div style={{width: 96}}><PillarButton pillar="food" selected /></div>
+          <div style={{width: 96}}><PillarButton pillar="safety" /></div>
+        </div>
+      </div>
+    );
+  </script>
+</body>
+</html>
