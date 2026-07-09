@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { getSession } from './lib/session'
-import { giftsProfileApi } from './lib/api'
 import PhoneInput from './components/auth/PhoneInput'
 import GiftsCapture from './components/gifts-profile/GiftsCapture'
 import TradeExchange from './components/trade-exchange/TradeExchange'
@@ -19,30 +18,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-// Redirects to /profile if no gifts profile exists yet
+// Redirects to /trade after profile check
 function HomePage() {
-  const [checking, setChecking] = useState(true)
-  const [hasProfile, setHasProfile] = useState(false)
-
-  useEffect(() => {
-    giftsProfileApi.get()
-      .then((p) => setHasProfile(!!p))
-      .catch(() => setHasProfile(false))
-      .finally(() => setChecking(false))
-  }, [])
-
-  if (checking) return null
-  if (!hasProfile) return <Navigate to="/profile" replace />
-
-  return (
-    <div className="min-h-screen p-4" style={{ backgroundColor: 'var(--canvas)' }}>
-      <div className="bg-pillar-water text-white p-4 rounded-lg mb-4">
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 'bold' }}>
-          Community Hub
-        </h1>
-      </div>
-    </div>
-  )
+  return <Navigate to="/trade" replace />
 }
 
 function JoinPage() {
