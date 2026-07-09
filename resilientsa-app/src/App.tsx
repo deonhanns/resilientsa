@@ -5,6 +5,7 @@ import { giftsProfileApi } from './lib/api'
 import PhoneInput from './components/auth/PhoneInput'
 import GiftsCapture from './components/gifts-profile/GiftsCapture'
 import TradeExchange from './components/trade-exchange/TradeExchange'
+import StewardDashboard from './components/steward-dashboard/StewardDashboard'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState<boolean | null>(null)
@@ -60,7 +61,7 @@ export default function App() {
         <Route path="/profile" element={<ProtectedRoute><GiftsCapture /></ProtectedRoute>} />
         <Route path="/trade"   element={<ProtectedRoute><TradeExchange /></ProtectedRoute>} />
         <Route path="/support" element={<div>Community Marketplace — ORDER 008</div>} />
-        <Route path="/steward" element={<div>Steward Dashboard — ORDER 007</div>} />
+        <Route path="/steward" element={<ProtectedRoute><StewardDashboard /></ProtectedRoute>} />
         <Route path="/admin"   element={<div>Node Admin — Phase 2</div>} />
       </Routes>
     </BrowserRouter>

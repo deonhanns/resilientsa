@@ -6,6 +6,7 @@ import cors from 'cors'
 import authRoutes from './routes/auth'
 import giftsRouter from './routes/gifts'
 import listingsRouter from './routes/listings'
+import stewardRouter from './routes/steward'
 import { requireSession } from './middleware/session'
 
 const app = express()
@@ -25,6 +26,9 @@ app.use('/gifts-profile', giftsRouter)
 
 // Listings, matches, trade completions, exchange reference
 app.use('/', listingsRouter)
+
+// Cell Steward dashboard
+app.use('/steward', stewardRouter)
 
 // Health check
 app.get('/api/me', (req, res) => {

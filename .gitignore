@@ -1,2 +1,9 @@
 # Playwright browser testing artifacts
 .playwright-mcp/
+
+# Zoo Code / Roo Code internal config
+.roo/
+
+# Environment files (secrets)
+.env*
+!.env.example

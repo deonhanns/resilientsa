@@ -1,72 +1,118 @@
 # MISSION STATUS
 **Mission:** ResilientSA
 **Custodian:** Spock
-**Status:** ACTIVE — documentation sprint COMPLETE. Ready to build.
+**Status:** ACTIVE — BUILD PHASE. Orders 001–006 complete. Orders 007+008 next.
 
 ---
 
 ## CURRENT PHASE
 
-**Pre-build documentation sprint: COMPLETE.**
+**Build Phase — Orders 001–006 COMPLETE.** The core product experience (sign-up → gifts profile → trade exchange) is functional and deployed to Vercel preview. McCoy's clickable prototype covers all three primary screens. The Engine Room is ready for the next parallel orders: 007 (Cell Steward Dashboard) and 008 (Community Marketplace).
 
-All doctrine, architecture, and feature gaps are closed. The ship is ready for ORDER 001 — the clickable prototype. No Crew Order is issued until ORDER 001 is complete and Bones-approved.
-
-**Engine Room configuration:** Kilo Code cold-start verified 2026-06-30. Branch strategy: `main` is working/Vercel-preview branch pre-launch.
+**Engine Room configuration:** Zoo Code crew modes activated (`.roomodes` + `AGENTS.md`) per fleet-wide `CREW_ACTIVATION_SPEC.md` v1.0. Branch strategy: `main` is working/Vercel-preview branch pre-launch.
 
 ---
 
-## THE FULL DOCUMENT SET
+## ORDERS — STATUS BOARD
 
-| Document | Path | Status |
+| Order | What | Owner | Status | Bones | Worf |
+|---|---|---|---|---|---|
+| 001 | Clickable Prototype | McCoy | ✅ COMPLETE | PASS | — |
+| 002 | Project Scaffold + Design Tokens + i18n | O'Brien | ✅ COMPLETE | — | — |
+| 003 | PostgreSQL Schema (25 tables) | O'Brien | ✅ COMPLETE | — | ALL CLEAR |
+| 004 | SMS OTP Authentication | O'Brien | ✅ COMPLETE | CONDITIONAL PASS | CONDITIONAL PASS |
+| 005 | Gifts Profile | O'Brien | ✅ COMPLETE | PASS | — |
+| 006 | Trade Exchange | O'Brien | ✅ COMPLETE | CONDITIONAL PASS | — |
+| **007** | **Cell Steward Dashboard + Batch Jobs** | **O'Brien** | **AWAITING CREW ORDER** | **Required** | — |
+| **008** | **Community Marketplace** | **O'Brien** | **AWAITING CREW ORDER** | **Required** | — |
+| 009 | Notifications (SMS + WhatsApp) | O'Brien | Pending 007 | Required (both languages) | Required |
+| 010 | Crisis Mode + Resource Map | O'Brien | Pending 006, 009 | Required (both languages) | — |
+
+Orders 007 and 008 run in parallel — both depend only on ORDER 006.
+
+---
+
+## WHAT SHIPPED
+
+### ORDER 001 — McCoy Clickable Prototype
+- Three clickable screens: Trade Exchange, Community Marketplace, Cell Steward Dashboard
+- Bones-approved. Committed to `design/prototype-v1/`
+- Visual reference for all subsequent O'Brien builds
+
+### ORDER 002 — Project Scaffold
+- `resilientsa-app/` — Vite + React 19 + TypeScript scaffold
+- Living Soil design tokens in `src/styles/` (colors, typography, spacing, fonts)
+- Tailwind v4 configured with all six pillar colours, tints, and semantic tokens
+- `src/lib/pillars.ts` — canonical Six Pillars constants
+- i18n: `react-i18next` with en.json, af.json, zu.json scaffold
+- Vercel preview: https://resilientsa-app.vercel.app
+- Stub hooks: `useOutboxSync.ts`, `useOfflineStatus.ts`
+
+### ORDER 003 — PostgreSQL Schema
+- 25 Drizzle schema files across `public` and `coop_pii` schemas
+- Neon Postgres project: `resilientsa` (PostgreSQL 16, eu-central-1)
+- All PII fields bytea (pgcrypto encrypted): `phone_number`, `whatsapp_number`, `full_name`, `surname`, `address`, `id_number`, `email`, `contact_email`
+- RLS enabled on every table; `coop_pii` restricted to `node_admin` role
+- 19 indexes; `phoneHash` column for deterministic encrypted lookup
+- Worf: ALL CLEAR (`WORF_ALERTS/2026-07-02-order003-schema-review.md`)
+
+### ORDER 004 — Authentication
+- Express 5 API server on port 3001
+- `POST /auth/request-code` and `POST /auth/verify-code` — Africa's Talking SMS
+- AES-256-CBC phone encryption + HMAC-SHA256 phone hashing
+- IndexedDB session storage (idb); SA number normalisation (+27 prefix)
+- PWA auth screens: PhoneInput + OtpInput (single component, two-step flow)
+- i18n: 12 auth keys in en.json + af.json
+- Bones: CONDITIONAL PASS (`BONES_VERDICT.md` — Afrikaans fallback acknowledged)
+- Worf: CONDITIONAL PASS (`WORF_ALERTS/2026-07-02-order004-auth-review.md` — sandbox logging in dev guard)
+
+### ORDER 005 — Gifts Profile
+- `GET /gifts-profile/me` + `PUT /gifts-profile/me` with RLS context
+- `withRLSContext` wrapper using `SELECT set_config()` for per-transaction RLS
+- Three-question sequential capture: lovesToDo → caresDeeplyAbout → wouldLoveToLearn
+- Complementary gifts nudge fires on first profile completion
+- 13 i18n keys in en.json + af.json
+- Bones: PASS
+
+### ORDER 006 — Trade Exchange
+- Full listings CRUD: `POST /listings`, `GET /listings` (with filters), `PATCH /listings/:id`, `DELETE /listings/:id`
+- Match flow: `POST /matches` (Steward-gated), `PATCH /matches/:id/confirm`, `POST /trade-completions/:id/confirm-fairness`
+- Community Exchange Reference: `GET /community-exchange-reference`
+- Offline outbox: IndexedDB outbox pattern + `useOutboxSync` hook
+- McCoy-approved UI: ListingCard (6px pillar border), PillarFilterRow, CreateListingSheet, TradeExchange
+- 9 i18n keys in en.json + af.json
+- `phoneHash` fix: deterministic user lookup via HMAC-SHA256 (resolved non-deterministic encryptPhone lookup bug)
+- Bones: CONDITIONAL PASS (emoji icon fallback acknowledged, Phase 2)
+
+---
+
+## WORF FLAGS — OPEN
+
+*None active.* Both ORDER 003 (ALL CLEAR) and ORDER 004 (CONDITIONAL PASS) are resolved.
+
+---
+
+## BONES VERDICTS — SUMMARY
+
+| Order | Verdict | Condition |
 |---|---|---|
-| Mission Brief v1.0 | `docs/mission-brief-v1.0.md` | ✅ Done |
-| Technical Architecture v1.0 | `docs/technical-architecture-v1.0.md` | ✅ Done |
-| June Holley Integration Guide v1.0 | `docs/june-holley-integration-guide-v1.0.md` | ✅ Done |
-| Crisis Roles Framework Spec v1.0 | `docs/crisis-roles-framework-spec-v1.0.md` | ✅ Done |
-| Anticipatory Intelligence Spec v1.0 | `docs/anticipatory-intelligence-spec-v1.0.md` | ✅ Done |
-| Pillar Integration Reference v1.0 | `docs/pillar-integration-reference-v1.0.md` | ✅ Done |
-| Community Health Protocol Spec v1.0 | `docs/community-health-protocol-spec-v1.0.md` | ✅ Done |
-| Bones Protocol v1.0 | `docs/bones-protocol-v1.0.md` | ✅ Done |
-| Build Roadmap v1.0 | `docs/build-roadmap-v1.0.md` | ✅ Done |
-| Community Marketplace Spec v1.0 | `docs/community-marketplace-spec-v1.0.md` | ✅ Done |
-| Cooperative Formation Spec v1.0 | `docs/cooperative-formation-spec-v1.0.md` | ✅ Done |
-| SEDA Partnership Brief v1.0 | `docs/seda-partnership-brief-v1.0.md` | ✅ Done — held, not sent |
-| Brand Palette v1.0 | `docs/brand-palette-v1.0.md` | ✅ Done |
-| Elder Prospectus v1.0 | `docs/elder-prospectus-v1.0.md` | ✅ Done |
-| Claude Design Onboarding Brief | `docs/claude-design-onboarding-brief.md` | ✅ Done |
+| 004 — Auth Screens | CONDITIONAL PASS | Afrikaans placeholder translations — professional review before production |
+| 005 — Gifts Profile | PASS | — |
+| 006 — Trade Exchange | CONDITIONAL PASS | Emoji icon fallback — full Icon system in Phase 2 |
 
 ---
 
-## CREW FILES
+## WHAT'S OPEN
 
-| File | Status |
-|---|---|
-| `CREW_MANIFEST.md` | ✅ Done — fleet doctrine aligned |
-| `CREW_ORDERS/README.md` | ✅ Done — 11-element structure |
-| `OBRIEN_STANDUP.md` | ✅ Seeded |
-| `SCOTTY_PATTERNS.md` | ✅ Seeded |
-| `UHURA_INTEL.md` | ✅ Done — regulatory watch + community resilience signal watch |
-| `WORF_ALERTS/README.md` | ✅ Seeded |
-| `kilo.jsonc` | ✅ Done — project-scoped |
-| `.kilo/rules/crew-protocols.md` | ✅ Done — cold-start verified |
-| `.kilo/rules/security.md` | ✅ Done |
-
----
-
-## BUILD SEQUENCE (from `docs/build-roadmap-v1.0.md`)
-
-| Order | What | Owner | Status |
-|---|---|---|---|
-| 001 | Clickable Prototype | McCoy (Claude Design) | **NEXT ACTION** |
-| 002 | Project Scaffold + Design Tokens | O'Brien | Pending 001 |
-| 003 | PostgreSQL Schema | O'Brien | Pending 002 |
-| 004 | Authentication | O'Brien | Pending 003 |
-| 005 | Gifts Profile | O'Brien | Pending 004 |
-| 006 | Trade Exchange | O'Brien | Pending 005 |
-| 007 | Cell Steward Dashboard + Batch Jobs | O'Brien | Pending 006 |
-| 008 | Community Marketplace | O'Brien | Pending 006 (parallel with 007) |
-| 009 | Notifications (SMS + WhatsApp) | O'Brien | Pending 004, 006, 007 |
-| 010 | Crisis Mode + Resource Map | O'Brien | Pending 006, 009 |
+| Item | Owner | Status |
+|---|---|---|
+| CREW-ORDER-007 (Steward Dashboard) | Spock | **AUTHORING NOW** |
+| CREW-ORDER-008 (Community Marketplace) | Spock | **AUTHORING NOW** |
+| CREW-ORDER-009 (Notifications) | Spock | Queued after 007 |
+| CREW-ORDER-010 (Crisis Mode) | Spock | Queued after 006, 009 |
+| Afrikaans professional translation review | Captain / Uhura | Before production launch |
+| Full Icon system integration (replace emoji fallbacks) | O'Brien | Phase 2 |
+| MISSION_STATUS.md stale fix | Spock | **DONE — this update** |
 
 ---
 
@@ -74,19 +120,14 @@ All doctrine, architecture, and feature gaps are closed. The ship is ready for O
 
 | Action | Timing |
 |---|---|
-| Open first Cape Town RA/CPF relationship | After ORDER 001 prototype is Bones-approved |
-| Send SEDA partnership brief | After ORDER 010 — pilot evidence required |
+| Open first Cape Town RA/CPF relationship | After ORDER 010 — pilot-ready platform |
+| Send SEDA partnership brief | After ORDER 010 — pilot evidence exists |
 | CIPC relationship | Phase 2 — after registered cooperatives exist |
 | CBDA relationship | Phase 2/3 |
 | June Holley / Network Weaving Institute outreach | Future — after pilot evidence |
+| Afrikaans translation review | Before production launch |
 
 ---
 
-## WORF FLAGS — OPEN
-
-*None — no build has started.*
-
----
-
-*Last updated: 2026-07-02*
-*Next update: on ORDER 001 completion*
+*Last updated: 2026-07-09 (Spock — ground-truth update after ORDER 006 completion)*
+*Next update: on ORDER 007 or 008 completion*

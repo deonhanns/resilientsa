@@ -35,10 +35,25 @@ export const api = {
   delete: <T>(path: string)                => request<T>('DELETE', path),
 }
 
-import type { GiftsProfile } from './types'
+import type { GiftsProfile, StewardDashboard, IsolateList, HubsData, NetworkSummary } from './types'
 
 export const giftsProfileApi = {
   get: () => api.get<GiftsProfile | null>('/gifts-profile/me'),
   put: (data: Partial<GiftsProfile>) =>
     api.put<GiftsProfile>('/gifts-profile/me', data),
+}
+
+export const stewardApi = {
+  dashboard: (cellId: string) => api.get<StewardDashboard>(`/steward/dashboard/${cellId}`),
+  isolates: (cellId: string) => api.get<IsolateList>(`/steward/isolates/${cellId}`),
+  hubs: (cellId: string) => api.get<HubsData>(`/steward/hubs/${cellId}`),
+  networkSummary: (cellId: string) => api.get<NetworkSummary>(`/steward/network-summary/${cellId}`),
+  logOfflineTrade: (data: {
+    cellId: string
+    description: string
+    pillar: string
+    offeringParty: string
+    needingParty: string
+    date?: string
+  }) => api.post<{ listingId: string; tradeCompletionId: string }>('/steward/log-offline-trade', data),
 }
