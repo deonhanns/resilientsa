@@ -1,0 +1,6 @@
+{
+  "framework": "vite",
+  "buildCommand": "cd resilientsa-app && npm install && npm run build",
+  "outputDirectory": "resilientsa-app/dist",
+  "installCommand": "cd resilientsa-app && npm install"
+}
