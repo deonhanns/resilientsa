@@ -1,13 +1,9 @@
 // api/_lib/db.ts
 // Database client for Vercel serverless functions
-// Uses pg Pool — if Neon connection errors occur in production,
-// switch to @neondatabase/serverless per CREW-ORDER-007b Section 11
-import { drizzle } from 'drizzle-orm/node-postgres'
-import { Pool } from 'pg'
+// Uses @neondatabase/serverless — Neon's HTTP-based driver for serverless
+import { neon } from '@neondatabase/serverless'
+import { drizzle } from 'drizzle-orm/neon-http'
 import * as schema from '../../src/db/index'
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-})
-
-export const db = drizzle(pool, { schema })
+const sql = neon(process.env.DATABASE_URL!)
+export const db = drizzle(sql, { schema })
