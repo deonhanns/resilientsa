@@ -1,8 +1,12 @@
 {
-  "framework": "vite",
   "buildCommand": "cd resilientsa-app && npm install && npm run build",
   "outputDirectory": "resilientsa-app/dist",
   "installCommand": "cd resilientsa-app && npm install",
+  "functions": {
+    "api/**/*.ts": {
+      "runtime": "@vercel/node@5.8.26"
+    }
+  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
