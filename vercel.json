@@ -3,7 +3,7 @@
   "outputDirectory": "resilientsa-app/dist",
   "installCommand": "cd resilientsa-app && npm install",
   "functions": {
-    "api/**/*.ts": {
+    "resilientsa-app/api/**/*.ts": {
       "runtime": "@vercel/node@5.8.26"
     }
   },
