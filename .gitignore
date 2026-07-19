@@ -7,3 +7,4 @@
 # Environment files (secrets)
 .env*
 !.env.example
+.vercel

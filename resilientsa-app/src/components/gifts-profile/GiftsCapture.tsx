@@ -49,16 +49,23 @@ export default function GiftsCapture() {
 
   async function handleSubmit() {
     setSaving(true)
+    const demo = new URLSearchParams(window.location.search).has('demo')
     try {
-      await giftsProfileApi.put({
-        lovesToDo:       answers[0],
-        naturallyGoodAt: answers[1],
-        caresDeeplyAbout: answers[2],
-      })
+      if (!demo) {
+        await giftsProfileApi.put({
+          lovesToDo:       answers[0],
+          naturallyGoodAt: answers[1],
+          caresDeeplyAbout: answers[2],
+        })
+      }
       setSubmitted(true)
-      setTimeout(() => navigate('/trade'), 2000)
+      setTimeout(() => navigate(`/trade${demo ? '?demo' : ''}`), 2000)
     } catch {
       // silently fail — user can retry
+      if (demo) {
+        setSubmitted(true)
+        setTimeout(() => navigate('/trade?demo'), 2000)
+      }
     } finally {
       setSaving(false)
     }

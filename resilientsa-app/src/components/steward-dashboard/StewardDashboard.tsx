@@ -115,19 +115,42 @@ function MemberRow({ member }: { member: DashboardData['members'][number] }) {
 }
 
 // ─── MAIN COMPONENT ───
+const DEMO_DATA: DashboardData = {
+  cellName: 'Khayelitsha Cell A',
+  members: [
+    { id: '1', displayName: 'Thandi M.', role: 'member', recentConnections: 5, giftsProfile: { lovesToDo: 'Teaching children to read', caresDeeplyAbout: 'Clean water access' } },
+    { id: '2', displayName: 'Sipho K.', role: 'member', recentConnections: 12, giftsProfile: { lovesToDo: 'Fixing things around the house', caresDeeplyAbout: 'Youth employment' } },
+    { id: '3', displayName: 'Nomsa D.', role: 'member', recentConnections: 0, giftsProfile: { lovesToDo: 'Growing vegetables', caresDeeplyAbout: 'Food security for elders' } },
+    { id: '4', displayName: 'Lungile P.', role: 'cell_steward', recentConnections: 8, giftsProfile: { lovesToDo: 'Connecting neighbours', caresDeeplyAbout: 'Community safety' } },
+    { id: '5', displayName: 'Bongani Z.', role: 'member', recentConnections: 3, giftsProfile: null },
+    { id: '6', displayName: 'Zanele R.', role: 'member', recentConnections: 0, giftsProfile: { lovesToDo: 'Cooking for large groups', caresDeeplyAbout: 'Elder care' } },
+    { id: '7', displayName: 'Themba N.', role: 'member', recentConnections: 1, giftsProfile: null },
+  ],
+  needsRadar: { water: 4, food: 7, health: 2, safety: 1, energy: 3, skills: 0 },
+  recentActivity: { newListings: 12, completedTrades: 5, newConnections: 8 },
+  reciprocityFlags: [
+    { memberId: '2', name: 'Sipho K.', direction: 'giving', ratio: 4 },
+  ],
+}
+
 export default function StewardDashboard() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const demo = new URLSearchParams(window.location.search).has('demo')
 
   useEffect(() => {
-    // For MVP: hardcoded test cell ID. Real implementation gets cellId from user session.
+    if (demo) {
+      setData(DEMO_DATA)
+      setLoading(false)
+      return
+    }
     const testCellId = 'c0000000-0000-0000-0000-000000000000'
     stewardApi.dashboard(testCellId)
       .then(setData)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [demo])
 
   if (loading) return <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
   if (error) return <div style={{ padding: 24, color: '#C85A3C' }}>Could not load dashboard. {error}</div>

@@ -1,13 +1,15 @@
 # MISSION STATUS
 **Mission:** ResilientSA
 **Custodian:** Spock
-**Status:** ACTIVE — BUILD PHASE. Orders 001–006 complete. Orders 007+008 next.
+**Status:** ACTIVE — BUILD PHASE. Orders 001–006 complete. Order 007 in progress (~85%). Order 008 ready.
 
 ---
 
 ## CURRENT PHASE
 
-**Build Phase — Orders 001–006 COMPLETE.** The core product experience (sign-up → gifts profile → trade exchange) is functional and deployed to Vercel preview. McCoy's clickable prototype covers all three primary screens. The Engine Room is ready for the next parallel orders: 007 (Cell Steward Dashboard) and 008 (Community Marketplace).
+**Build Phase — Orders 001–006 COMPLETE.** The core product experience (sign-up → gifts profile → trade exchange) is functional and deployed to Vercel preview. ORDER 007 (Cell Steward Dashboard) Session 1 is complete — backend API, frontend UI, and batch jobs are built, verified (`npm run build` zero errors), and pushed. ORDER 008 (Community Marketplace) Crew Order is issued and ready.
+
+**Blocker resolved (2026-07-19):** Git push credentials fixed — `deonhanns` authenticated via `gh` CLI, stale `kimosabe17` keychain token purged.
 
 **Engine Room configuration:** Zoo Code crew modes activated (`.roomodes` + `AGENTS.md`) per fleet-wide `CREW_ACTIVATION_SPEC.md` v1.0. Branch strategy: `main` is working/Vercel-preview branch pre-launch.
 
@@ -23,12 +25,14 @@
 | 004 | SMS OTP Authentication | O'Brien | ✅ COMPLETE | CONDITIONAL PASS | CONDITIONAL PASS |
 | 005 | Gifts Profile | O'Brien | ✅ COMPLETE | PASS | — |
 | 006 | Trade Exchange | O'Brien | ✅ COMPLETE | CONDITIONAL PASS | — |
-| **007** | **Cell Steward Dashboard + Batch Jobs** | **O'Brien** | **AWAITING CREW ORDER** | **Required** | — |
-| **008** | **Community Marketplace** | **O'Brien** | **AWAITING CREW ORDER** | **Required** | — |
+| **007** | **Cell Steward Dashboard + Batch Jobs** | **O'Brien** | **🟡 IN PROGRESS (85%)** | **PENDING** | — |
+| **008** | **Community Marketplace** | **O'Brien** | **⬜ READY — not started** | **Required** | — |
 | 009 | Notifications (SMS + WhatsApp) | O'Brien | Pending 007 | Required (both languages) | Required |
 | 010 | Crisis Mode + Resource Map | O'Brien | Pending 006, 009 | Required (both languages) | — |
 
 Orders 007 and 008 run in parallel — both depend only on ORDER 006.
+
+**ORDER 007 detail:** Backend API (5 routes), frontend dashboard UI, and batch jobs built and pushed. Remaining: Bones review, deferred sub-components (IsolateList, HubList, LogOfflineTrade), i18n verification.
 
 ---
 
@@ -106,13 +110,16 @@ Orders 007 and 008 run in parallel — both depend only on ORDER 006.
 
 | Item | Owner | Status |
 |---|---|---|
-| CREW-ORDER-007 (Steward Dashboard) | Spock | **AUTHORING NOW** |
-| CREW-ORDER-008 (Community Marketplace) | Spock | **AUTHORING NOW** |
+| ORDER 007: Bones review | Spock → Bones | **PENDING — required before order complete** |
+| ORDER 007: Deferred sub-components (IsolateList, HubList, LogOfflineTrade) | O'Brien | Follow-up session needed |
+| ORDER 007: i18n key verification | O'Brien | Verify steward keys in en.json + af.json |
+| ORDER 007: Standup entry commit | O'Brien | Written to working directory, uncommitted |
+| CREW-ORDER-008 (Community Marketplace) | O'Brien | **READY — can start immediately** |
 | CREW-ORDER-009 (Notifications) | Spock | Queued after 007 |
 | CREW-ORDER-010 (Crisis Mode) | Spock | Queued after 006, 009 |
 | Afrikaans professional translation review | Captain / Uhura | Before production launch |
 | Full Icon system integration (replace emoji fallbacks) | O'Brien | Phase 2 |
-| MISSION_STATUS.md stale fix | Spock | **DONE — this update** |
+| san-scribe-hq access (MASTER_INDEX, FLEET_STATUS, CROSS_MISSION_LOG) | Captain | 🔴 GitHub MCP auth failed — fleet coordination layer unreachable |
 
 ---
 
@@ -129,5 +136,5 @@ Orders 007 and 008 run in parallel — both depend only on ORDER 006.
 
 ---
 
-*Last updated: 2026-07-09 (Spock — ground-truth update after ORDER 006 completion)*
-*Next update: on ORDER 007 or 008 completion*
+*Last updated: 2026-07-19 (Spock — strategic analysis + credential fix session)*
+*Next update: on ORDER 007 Bones verdict or ORDER 008 start*

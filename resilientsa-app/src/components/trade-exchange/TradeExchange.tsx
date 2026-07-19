@@ -50,6 +50,12 @@ export default function TradeExchange() {
 
   // Get cell from session on mount
   useEffect(() => {
+    const demo = new URLSearchParams(window.location.search).has('demo')
+    if (demo) {
+      setCellId('demo-cell')
+      setLoading(false)
+      return
+    }
     api.get<{ nodeId?: string }>('/api/me')
       .then(() => {
         setCellId('default')

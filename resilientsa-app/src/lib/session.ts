@@ -29,3 +29,7 @@ export async function clearSession(): Promise<void> {
   const db = await getDB()
   await db.delete(STORE, 'current')
 }
+
+export async function setDemoSession(): Promise<void> {
+  await saveSession('demo-token', 'demo-user-id', 'cell_steward')
+}
