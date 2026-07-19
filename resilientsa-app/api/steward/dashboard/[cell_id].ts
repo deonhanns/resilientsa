@@ -22,6 +22,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const cellId = req.query.cell_id as string
   if (!cellId) return res.status(400).json({ error: 'cell_id required' })
 
+  // Guard against placeholder/invalid cell IDs
+  if (cellId === 'c0000000-0000-0000-0000-000000000000') {
+    return res.json({
+      cellName: 'Demo Cell',
+      members: [],
+      needsRadar: {},
+      recentActivity: { newListings: 0, completedTrades: 0, newConnections: 0 },
+      reciprocityFlags: [],
+    })
+  }
+
   try {
     const result = await withRLSContext(session.nodeId, session.userRole, async () => {
       const [cell] = await db
