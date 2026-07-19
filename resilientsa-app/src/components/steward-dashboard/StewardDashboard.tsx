@@ -5,6 +5,9 @@ import { useEffect, useState } from 'react'
 import { stewardApi } from '../../lib/api'
 import type { StewardDashboard as DashboardData } from '../../lib/types'
 import { PILLAR_COLOURS, PILLAR_TINTS, PILLAR_LABELS, ALL_PILLARS, type Pillar } from '../../lib/pillars'
+import IsolateList from './IsolateList'
+import HubList from './HubList'
+import LogOfflineTrade from './LogOfflineTrade'
 
 // ─── Sub-component: NetworkSummary ───
 function NetworkSummaryCard({ trend, message, stat }: { trend: string; message: string; stat: string }) {
@@ -138,6 +141,7 @@ export default function StewardDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const demo = new URLSearchParams(window.location.search).has('demo')
+  const testCellId = 'c0000000-0000-0000-0000-000000000000'
 
   useEffect(() => {
     if (demo) {
@@ -145,7 +149,6 @@ export default function StewardDashboard() {
       setLoading(false)
       return
     }
-    const testCellId = 'c0000000-0000-0000-0000-000000000000'
     stewardApi.dashboard(testCellId)
       .then(setData)
       .catch((err) => setError(err.message))
@@ -195,6 +198,11 @@ export default function StewardDashboard() {
           </p>
         </div>
       </section>
+
+      {/* Deferred sub-components: Isolates, Hubs, Log Trade */}
+      <IsolateList cellId={testCellId} />
+      <HubList cellId={testCellId} />
+      <LogOfflineTrade members={data.members} cellId={testCellId} />
 
       {/* Reciprocity Flags */}
       {data.reciprocityFlags.length > 0 && (

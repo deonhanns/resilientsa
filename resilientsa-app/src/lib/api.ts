@@ -2,7 +2,7 @@
 // Typed API client — reads session token from IndexedDB
 import { getSession } from './session'
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
+const BASE_URL = import.meta.env.VITE_API_URL ?? '/api'
 
 async function getToken(): Promise<string | null> {
   const session = await getSession()

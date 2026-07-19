@@ -3,13 +3,35 @@
 
 ---
 
-## 2026-07-09 — ORDER 007 Session 1 (IN PROGRESS)
+## 2026-07-19 — CREW-ORDER-007b SHIPPED ✅
+**Vercel Serverless Conversion — all Express routes converted to Vercel Functions**
+- 17 serverless functions in `api/` — auth, gifts-profile, listings, matches, trade-completions, steward, community-exchange-reference
+- Shared middleware library: `api/_lib/` (db, session, db-context, crypto, otp, at, gifts-nudge)
+- `@vercel/node` runtime configured in `vercel.json`
+- Frontend `BASE_URL` switched from `http://localhost:3001` → `/api` (same-origin, no CORS)
+- `express` server preserved for local development (set `VITE_API_URL=http://localhost:3001` in `.env.local`)
+
+**ORDER 007 deferred sub-components completed:**
+- `IsolateList.tsx` — collapsible isolate viewer with "Reach out" nudge buttons
+- `HubList.tsx` — collapsible hub connector viewer with risk badges (attention/concern/none)
+- `LogOfflineTrade.tsx` — manual trade logging form (member selectors, pillar picker, description)
+- All three wired into `StewardDashboard.tsx` as collapsible sections below NeedsRadar
+
+**Schema bugs discovered and fixed during tsc compilation:**
+- `tradeCompletions` table has no `nodeId` or `listingId` columns — Express routes had silent runtime bugs
+- Log-offline-trade now skips TradeCompletion creation (requires `matchId` NOT NULL, no match exists for manual trades)
+
+**Build:** `tsc -b && vite build` — zero errors, 70 modules, 332 KB JS
+
+**Status:** Bones review PENDING. Worf review PENDING (serverless security boundary).
+
+## 2026-07-09 — ORDER 007 Session 1 (COMPLETE — superseded by 007b)
 **Cell Steward Dashboard + Batch Jobs — backend complete, frontend built, not yet Bones-reviewed**
 - 5 API routes: `/steward/dashboard`, `/steward/isolates`, `/steward/hubs`, `/steward/network-summary`, `/steward/log-offline-trade`
 - Batch jobs: `NetworkPhaseSnapshot` (June Holley four-phase) + `InternalForecast` (listing/connection velocity)
 - `StewardDashboard.tsx` — NeedsRadar, NetworkSummary, MemberRow (inline sub-components)
 - 9 steward TypeScript types, 5 stewardApi methods
-- **Status:** Bones review PENDING. IsolateList, HubList, LogOfflineTrade deferred.
+- **Status:** Bones review PENDING. IsolateList, HubList, LogOfflineTrade now completed in 007b.
 
 ---
 

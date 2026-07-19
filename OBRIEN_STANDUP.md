@@ -413,6 +413,65 @@ If blocked on the same issue for 3 consecutive sessions, escalate to Scotty per 
 
 ---
 
+### Session — 2026-07-19 (CREW-ORDER-007b — Vercel Serverless Conversion)
+
+**What I worked on:**
+- CREW-ORDER-007b: Converted all Express routes to Vercel Serverless Functions
+- Built deferred ORDER 007 sub-components (IsolateList, HubList, LogOfflineTrade)
+
+**What's now complete and where it lives:**
+- `resilientsa-app/api/_lib/` — shared middleware: `db.ts`, `session.ts`, `db-context.ts`, `crypto.ts`, `otp.ts`, `at.ts`, `gifts-nudge.ts`
+- `api/auth/request-code.ts` → `POST /api/auth/request-code`
+- `api/auth/verify-code.ts` → `POST /api/auth/verify-code`
+- `api/gifts-profile/me.ts` → `GET/PUT /api/gifts-profile/me`
+- `api/listings/index.ts` → `GET/POST /api/listings`
+- `api/listings/[id].ts` → `PATCH/DELETE /api/listings/:id`
+- `api/matches/index.ts` → `GET/POST /api/matches`
+- `api/matches/[id]/confirm.ts` → `PATCH /api/matches/:id/confirm`
+- `api/matches/[id]/decline.ts` → `PATCH /api/matches/:id/decline`
+- `api/trade-completions/[match_id]/confirm-fairness.ts` → `POST /api/trade-completions/:matchId/confirm-fairness`
+- `api/community-exchange-reference.ts` → `GET /api/community-exchange-reference`
+- `api/steward/dashboard/[cell_id].ts` → `GET /api/steward/dashboard/:cellId`
+- `api/steward/isolates/[cell_id].ts` → `GET /api/steward/isolates/:cellId`
+- `api/steward/hubs/[cell_id].ts` → `GET /api/steward/hubs/:cellId`
+- `api/steward/network-summary/[cell_id].ts` → `GET /api/steward/network-summary/:cellId`
+- `api/steward/log-offline-trade.ts` → `POST /api/steward/log-offline-trade`
+- `src/components/steward-dashboard/IsolateList.tsx` — collapsible isolate viewer with "Reach out" nudge
+- `src/components/steward-dashboard/HubList.tsx` — collapsible hub connector viewer with risk badges
+- `src/components/steward-dashboard/LogOfflineTrade.tsx` — manual trade logging form (member select, pillar picker, description)
+- `vercel.json` — updated with `functions` config for `@vercel/node` runtime + `rewrites` for API routing
+- `src/lib/api.ts` — `BASE_URL` updated from `http://localhost:3001` → `/api` (same-origin, no CORS)
+- `package.json` — `@vercel/node` added (pre-approved per Captain-approved Crew Order)
+
+**Verification — all pass:**
+- `npm run build` → tsc -b and vite build — zero errors ✅
+- 70 modules transformed, 332.52 KB JS, 17.98 KB CSS ✅
+- All 17 serverless functions compile clean ✅
+- `express` server (`server/`) preserved for local development ✅
+
+**Deviations from spec:**
+- `api/steward/log-offline-trade.ts`: TradeCompletion is NOT created for offline trades. The `trade_completions` table schema requires `matchId` (NOT NULL), and manual offline trades have no match. ConnectionEvent rows serve the same network-health purpose. The Express route had the same runtime bug (used `nodeId`/`listingId` columns that don't exist on trade_completions).
+- `tradeCompletions.nodeId` removed from steward dashboard completed-trades count query — column doesn't exist on the table (same bug as Express route, caught by tsc).
+- `tradeCompletions.listingId` removed from confirm-fairness — schema only has `matchId` (pre-existing Express bug caught by tsc).
+
+**What's blocked, and on whom:**
+- Nothing blocked. Build complete. Ready for Vercel deploy on push.
+- Bones review for StewardDashboard: PENDING — Spock to invoke Bones Protocol with screenshots
+- Worf review: PENDING per Section 4 — serverless security boundary changes
+
+**Protocol/pattern checked against:**
+- CREW_ORDERS/CREW-ORDER-007b.md — built to exact spec (Sections 6.2–6.10)
+- Existing Express routes — business logic preserved verbatim, only request/response wrapper changed
+- SCOTTY_PATTERNS.md — not yet created in this repo (flagging)
+
+**Anything flagged to Worf or Bones:**
+- Bones: StewardDashboard now includes IsolateList, HubList, and LogOfflineTrade sub-components. Full dashboard visible at `/steward?demo`. Spock needs to review for Bones verdict.
+- Worf: per Section 4 — serverless security boundary change. 4 checks required: RLS context in serverless, session token validation, no secrets in responses, env vars on Vercel.
+
+**Next:** Push → Vercel auto-deploy. Verify end-to-end on `resilientsa-app.vercel.app`. Invoke Bones Protocol with demo screenshots. Invoke Worf for serverless security review. Begin ORDER 008.
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*
