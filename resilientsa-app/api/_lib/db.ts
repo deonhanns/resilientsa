@@ -1,15 +1,8 @@
 // api/_lib/db.ts
 // Database client for Vercel serverless functions
-import { drizzle } from 'drizzle-orm/node-postgres'
-import { Pool } from 'pg'
+// Uses @vercel/postgres — Vercel's native Neon wrapper for serverless
+import { sql } from '@vercel/postgres'
+import { drizzle } from 'drizzle-orm/vercel-postgres'
 import * as schema from '../../src/db/index'
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-  max: 1, // Serverless: limit to 1 connection per function instance
-  idleTimeoutMillis: 10000,
-  connectionTimeoutMillis: 5000,
-})
-
-export const db = drizzle(pool, { schema })
+export const db = drizzle(sql, { schema })
