@@ -83,3 +83,58 @@ export interface NetworkSummary {
   stat: string
   lastUpdated: string
 }
+
+// --- Community Marketplace types (ORDER 008) ---
+
+export interface MarketplaceOffering {
+  id: string
+  name: string
+  shortDescription: string | null
+  pillarTags: string[]
+  providerName: string
+  providerVerified: boolean
+  endorsementCount: number
+  totalEndorsements: number
+  status: string
+}
+
+export interface MarketplaceOfferingsResponse {
+  offerings: MarketplaceOffering[]
+}
+
+export interface GrounderOffering {
+  id: string
+  name: string
+  shortDescription: string | null
+  pillarTags: string[]
+  status: string
+  createdAt: string
+  updatedAt: string
+  engagementCount: number
+}
+
+export interface GrounderOfferingsResponse {
+  offerings: GrounderOffering[]
+}
+
+export interface GrounderRequest {
+  id: string
+  offeringId: string
+  offeringName: string
+  nodeId: string
+  nodeName: string
+  requestContext: string | null
+  requestedAt: string
+  status: string
+  startedAt: string | null
+  completedAt: string | null
+}
+
+export interface GrounderRequestsResponse {
+  requests: GrounderRequest[]
+}
+
+export interface RequestResponse {
+  engagementId: string
+  status: string
+}

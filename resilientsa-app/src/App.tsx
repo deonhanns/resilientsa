@@ -5,6 +5,9 @@ import PhoneInput from './components/auth/PhoneInput'
 import GiftsCapture from './components/gifts-profile/GiftsCapture'
 import TradeExchange from './components/trade-exchange/TradeExchange'
 import StewardDashboard from './components/steward-dashboard/StewardDashboard'
+import Marketplace from './components/marketplace/Marketplace'
+import GrounderOfferings from './components/marketplace/GrounderOfferings'
+import GrounderRequests from './components/marketplace/GrounderRequests'
 
 const DEMO_PARAM = 'demo'
 
@@ -67,7 +70,9 @@ function DemoApp() {
         <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><GiftsCapture /></ProtectedRoute>} />
         <Route path="/trade"   element={<ProtectedRoute><TradeExchange /></ProtectedRoute>} />
-        <Route path="/support" element={<div>Community Marketplace — ORDER 008</div>} />
+        <Route path="/support" element={<ProtectedRoute><Marketplace /></ProtectedRoute>} />
+        <Route path="/support/new" element={<ProtectedRoute><GrounderOfferings /></ProtectedRoute>} />
+        <Route path="/support/requests" element={<ProtectedRoute><GrounderRequests /></ProtectedRoute>} />
         <Route path="/steward" element={<ProtectedRoute><StewardDashboard /></ProtectedRoute>} />
         <Route path="/admin"   element={<div>Node Admin — Phase 2</div>} />
       </Routes>
