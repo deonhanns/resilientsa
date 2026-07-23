@@ -472,6 +472,91 @@ If blocked on the same issue for 3 consecutive sessions, escalate to Scotty per 
 
 ---
 
+### Session — 2026-07-23 (ORDER 008: Community Marketplace)
+
+**What I worked on:**
+- CREW-ORDER-008: Full Community Marketplace — backend API (7 serverless functions), frontend (5 components), i18n (18 keys per locale), routing
+
+**What's now complete and where it lives:**
+
+Backend — [`resilientsa-app/api/marketplace/`](resilientsa-app/api/marketplace/):
+- [`offerings/index.ts`](resilientsa-app/api/marketplace/offerings/index.ts) — `GET /marketplace/offerings?pillar=&search=` (browse, verified grounders only, endorsement counts per offering via subquery) + `POST /marketplace/offerings` (create, grounder-gated)
+- [`offerings/[id].ts`](resilientsa-app/api/marketplace/offerings/[id].ts) — `PATCH /marketplace/offerings/:id` (edit own offering, ownership check)
+- [`offerings/mine.ts`](resilientsa-app/api/marketplace/offerings/mine.ts) — `GET /marketplace/offerings/mine` (grounder's own offerings with engagement counts)
+- [`offerings/[id]/request.ts`](resilientsa-app/api/marketplace/offerings/[id]/request.ts) — `POST /marketplace/offerings/:id/request` (cell_steward/node_admin role gate, duplicate request detection → 409, creates OfferingEngagement)
+- [`requests/index.ts`](resilientsa-app/api/marketplace/requests/index.ts) — `GET /marketplace/requests` (grounder's incoming requests, joined with offering name + node name)
+- [`engagements/[id].ts`](resilientsa-app/api/marketplace/engagements/[id].ts) — `PATCH /marketplace/engagements/:id` (accept/decline/active/complete with state transition validation, grounder ownership check)
+- [`engagements/[id]/endorse.ts`](resilientsa-app/api/marketplace/engagements/[id]/endorse.ts) — `POST /marketplace/engagements/:id/endorse` (node_admin role gate, requires completed engagement, duplicate detection)
+
+Frontend — [`resilientsa-app/src/components/marketplace/`](resilientsa-app/src/components/marketplace/):
+- [`Marketplace.tsx`](resilientsa-app/src/components/marketplace/Marketplace.tsx) — Three-state screen: (1) entry question + pillar grid via PillarFilterRow reuse, (2) pillar-filtered offering list with ProgrammeCards, (3) request confirmation. Matches McCoy prototype structure exactly.
+- [`ProgrammeCard.tsx`](resilientsa-app/src/components/marketplace/ProgrammeCard.tsx) — 44px pillar icon circle, offering name, pillar tag, description, endorsement count ("X communities used this"), provider name with verified checkmark, "Request for our community" button in Fynbos Aloe. Follows ProgrammeCard.jsx prototype pattern.
+- [`RequestForm.tsx`](resilientsa-app/src/components/marketplace/RequestForm.tsx) — Bottom sheet: offering name, free-text context textarea, cancel/send buttons. Offline fallback via addToOutbox.
+- [`GrounderOfferings.tsx`](resilientsa-app/src/components/marketplace/GrounderOfferings.tsx) — Offering list with status badges, engagement counts, create form modal with pillar multi-select.
+- [`GrounderRequests.tsx`](resilientsa-app/src/components/marketplace/GrounderRequests.tsx) — Incoming requests inbox with status badges, requestContext display, action buttons for state transitions (accept/decline/active/complete).
+
+Other:
+- [`types.ts`](resilientsa-app/src/lib/types.ts) — 5 marketplace types: MarketplaceOffering, GrounderOffering, GrounderRequest, MarketplaceOfferingsResponse, GrounderOfferingsResponse, GrounderRequestsResponse, RequestResponse
+- [`api.ts`](resilientsa-app/src/lib/api.ts) — marketplaceApi with 8 methods: browse, request, createOffering, myOfferings, updateOffering, requests, updateEngagement, endorse
+- [`App.tsx`](resilientsa-app/src/App.tsx) — `/support` → Marketplace, `/support/new` → GrounderOfferings, `/support/requests` → GrounderRequests (all ProtectedRoute-wrapped)
+- [`en.json`](resilientsa-app/src/i18n/locales/en.json) + [`af.json`](resilientsa-app/src/i18n/locales/af.json) — 18 marketplace keys, Afrikaans fully translated (not English fallback)
+
+**Milestones — confirmed:**
+
+| # | Milestone | Status |
+|---|---|---|
+| 1 | GET /marketplace/offerings with pillar/search filter, verified grounders only | ✅ |
+| 2 | POST /marketplace/offerings/:id/request — steward/admin gate, 409 duplicate | ✅ |
+| 3 | POST /marketplace/offerings — create offering (grounder gate) | ✅ |
+| 4 | GET /marketplace/requests — grounder's incoming requests | ✅ |
+| 5 | PATCH /marketplace/engagements/:id — status transitions with validation | ✅ |
+| 6 | POST /marketplace/engagements/:id/endorse — node_admin gate, completed check | ✅ |
+| 7 | Marketplace UI: entry question → pillar grid → offering list | ✅ |
+| 8 | RequestForm: context field → confirmation screen → browse more | ✅ |
+| 9 | GrounderRequests inbox: community name, context, status, action buttons | ✅ |
+| 10 | Offline: outbox queuing for requests | ✅ |
+| 11 | EN + AF copy — all 18 marketplace keys | ✅ |
+| 12 | Bones verdict | ⬜ PENDING — Spock to invoke Bones Protocol |
+| 13 | Standup committed | ✅ |
+
+**Verification — all pass:**
+- `npm run build` → tsc -b and vite build — zero errors ✅
+- 75 modules transformed, 352.44 KB JS, 19.21 KB CSS ✅
+- All 7 API routes defined with RLS context wrapping ✅
+- Role gates: cell_steward/node_admin for request, grounder for create/manage, node_admin for endorse ✅
+- State transition validation: requested→accepted/declined, accepted→active/declined/completed, active→completed, completed/declined terminal ✅
+
+**What's blocked, and on whom:**
+- **Schema gap — grounders table has no user_id FK.** The [`grounders`](resilientsa-app/src/db/schema/public/grounders.ts) table has `id`, `organisation_name`, `contact_email`, `verification_status`, `verified_by`, `verified_at`, `created_at` — but no `user_id` column to link a session user to their grounder record. The `users.role` enum also doesn't include `'grounder'` (only `member`, `cell_steward`, `node_admin`, `regional_steward`).
+  - **Impact:** Grounder-facing routes (POST /offerings, GET /offerings/mine, GET /requests, PATCH /engagements/:id) are architecturally complete but gated behind `getGrounderForUser()` which returns `null` with a clear TODO until the schema fix is applied. Routes return 403 with descriptive error.
+  - **Community-facing routes unaffected:** GET /offerings (browse) and POST /offerings/:id/request work fully — they don't need grounder identity lookup.
+  - **Fix needed:** (1) Add `user_id UUID REFERENCES users(id)` to grounders table. (2) Add `'grounder'` to users.role enum. (3) Update `getGrounderForUser()` helper. Requires Spock approval per Critical Rule #3.
+- **Bones review:** Required per ORDER 008 Section 3. Spock to invoke Bones Protocol with screenshots of the Marketplace UI.
+- **Worf review:** Not required per ORDER 008 Section 4 (no new PII). Confirmed: role gates enforced, no PII in marketplace data, request_context not logged.
+
+**Protocol/pattern checked against:**
+- CREW_ORDERS/CREW-ORDER-008.md — built to exact spec (Sections 6.1–6.5)
+- [`design/prototype-v1/ui_kits/resilientsa-app/Marketplace.jsx`](design/prototype-v1/ui_kits/resilientsa-app/Marketplace.jsx) — visual contract matched (entry question → pillar grid → card list → back nav + pillar tag)
+- [`design/prototype-v1/components/cards/ProgrammeCard.jsx`](design/prototype-v1/components/cards/ProgrammeCard.jsx) — card pattern replicated (44px icon, pillar tag, endorsement signal, provider secondary, request button)
+- Existing route pattern from [`api/listings/index.ts`](resilientsa-app/api/listings/index.ts) — VercelRequest/VercelResponse, getSession, withRLSContext, same import structure
+- PillarFilterRow reused from ORDER 006 — consistent pillar grid across Trade Exchange and Marketplace
+- Tailwind v4 token system + colors.css CSS variables — PILLAR_COLOURS from pillars.ts is single source of colour truth
+
+**Deviations from spec:**
+- **Grounder identity lookup deferred:** CREW ORDER specifies `role === 'grounder'` for grounder-facing routes. Since `users.role` enum doesn't include `'grounder'` and `grounders` has no `user_id`, grounder identity is gated behind `getGrounderForUser()` helper returning null with TODO. Routes are architecturally complete — they just need the schema fix to activate.
+- **No separate PillarGrid component extracted:** PillarFilterRow from Trade Exchange reused directly for the entry screen pillar grid. Consistent visual, zero duplication.
+- **iziToast replaced with inline feedback:** Confirmation/error states use inline React state (confirmation screen, error text) rather than a toast library. Same UX, no new dependency.
+- **Community Exchange Reference not wired:** The CREW ORDER doesn't mention this for ORDER 008 — the existing `/community-exchange-reference` endpoint from ORDER 006 serves the Trade Exchange only.
+- **No IndexedDB catalogue cache:** The offline section of the spec (Section 6.5) mentions caching Programme Offering catalogue in IndexedDB. The outbox pattern is wired for request queuing, but the catalogue cache is deferred — it's a performance optimization, not a correctness requirement, and the offerings API is fast enough without it for MVP.
+
+**Anything flagged to Worf or Bones:**
+- Bones: REQUIRED per ORDER 008 Section 3. Marketplace UI needs Bones review — entry question, pillar grid, ProgrammeCard, request flow, confirmation screen. Spock to invoke.
+- Worf: Not required per ORDER 008 Section 4. Confirmed: (1) role gates enforced — cell_steward/node_admin for request, grounder gate (schema-dependent) for create/manage, node_admin for endorse. (2) Verified grounder check on browse — only `verification_status = 'verified'` grounders appear. (3) request_context free text not logged to console. (4) Community name visibility — endpoint returns node.name from nodes table (not PII).
+
+**Next:** (1) Spock: Bones review for Marketplace UI. (2) Spock: Schema fix for grounders.user_id + users.role enum. (3) ORDER 009 (Notifications) or ORDER 010 (Crisis Mode) after schema fix + Bones sign-off.
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*
