@@ -23,7 +23,7 @@ export const users = pgTable('users', {
   phoneHash:         text('phone_hash'),
   phoneNumber:       bytea('phone_number'),
   role:              text('role', {
-                       enum: ['member','cell_steward','node_admin','regional_steward']
+                       enum: ['member','cell_steward','node_admin','regional_steward','grounder']
                      }).default('member'),
   invitedBy:         uuid('invited_by'),
   preferredLanguage: text('preferred_language').default('en'),

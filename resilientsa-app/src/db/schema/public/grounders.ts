@@ -3,6 +3,7 @@ import { users, bytea } from './users'
 
 export const grounders = pgTable('grounders', {
   id:                 uuid('id').primaryKey().defaultRandom(),
+  userId:             uuid('user_id').unique().references(() => users.id),
   organisationName:   text('organisation_name').notNull(),
   contactEmail:       bytea('contact_email'),
   verificationStatus: text('verification_status', {

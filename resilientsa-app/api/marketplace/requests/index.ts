@@ -4,16 +4,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSession, unauthorized } from '../../_lib/session'
 import { withRLSContext } from '../../_lib/db-context'
+import { getGrounderForUser } from '../../_lib/grounder'
 import { db } from '../../_lib/db'
 import { offeringEngagements } from '../../../src/db/schema/public/offering-engagements'
 import { programmeOfferings } from '../../../src/db/schema/public/programme-offerings'
-import { grounders } from '../../../src/db/schema/public/grounders'
 import { nodes } from '../../../src/db/schema/public/nodes'
 import { eq, and, desc, sql } from 'drizzle-orm'
-
-async function getGrounderForUser(_userId: string): Promise<typeof grounders.$inferSelect | null> {
-  return null // TODO: Schema gap — grounders needs user_id FK
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })

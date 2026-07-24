@@ -3,14 +3,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSession, unauthorized } from '../../_lib/session'
 import { withRLSContext } from '../../_lib/db-context'
+import { getGrounderForUser } from '../../_lib/grounder'
 import { db } from '../../_lib/db'
 import { programmeOfferings } from '../../../src/db/schema/public/programme-offerings'
-import { grounders } from '../../../src/db/schema/public/grounders'
 import { eq, and } from 'drizzle-orm'
-
-async function getGrounderForUser(_userId: string): Promise<typeof grounders.$inferSelect | null> {
-  return null // TODO: Schema gap — grounders needs user_id FK
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' })

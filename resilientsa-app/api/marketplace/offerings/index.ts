@@ -3,17 +3,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSession, unauthorized, forbidden } from '../../_lib/session'
 import { withRLSContext } from '../../_lib/db-context'
+import { getGrounderForUser } from '../../_lib/grounder'
 import { db } from '../../_lib/db'
 import { programmeOfferings } from '../../../src/db/schema/public/programme-offerings'
 import { grounders } from '../../../src/db/schema/public/grounders'
 import { offeringEndorsements } from '../../../src/db/schema/public/offering-endorsements'
 import { eq, and, desc, sql } from 'drizzle-orm'
-
-// TODO: Schema gap — grounders table needs a user_id column to link a session user to their grounder record.
-// When user_id is added, replace this with: db.select().from(grounders).where(eq(grounders.userId, userId)).limit(1)
-async function getGrounderForUser(_userId: string): Promise<typeof grounders.$inferSelect | null> {
-  return null
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const session = await getSession(req)
