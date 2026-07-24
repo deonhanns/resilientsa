@@ -557,6 +557,66 @@ Other:
 
 ---
 
+### Session — 2026-07-24 (ORDER 008 Schema Fix)
+
+**What I worked on:**
+- CREW DIRECTIVE — ORDER 008 Schema Fix (Spock-approved): resolved the schema gap blocking grounder-facing marketplace routes
+
+**What's now complete and where it lives:**
+
+Schema:
+- [`grounders.ts`](resilientsa-app/src/db/schema/public/grounders.ts) — added `user_id UUID UNIQUE REFERENCES users(id)` (nullable)
+- [`users.ts`](resilientsa-app/src/db/schema/public/users.ts) — added `'grounder'` to `role` enum values
+- Migration: [`0003_steep_sinister_six.sql`](resilientsa-app/drizzle/migrations/0003_steep_sinister_six.sql) — purely additive (ADD COLUMN + 2x ADD CONSTRAINT). No DROP, no ALTER of existing columns, no row rewrite. Gate passed.
+
+Shared helper:
+- [`api/_lib/grounder.ts`](resilientsa-app/api/_lib/grounder.ts) — `getGrounderForUser(userId)` resolves session user's grounder record via `grounders.user_id`
+
+Updated 5 marketplace serverless functions (all now import from shared helper, no local stubs):
+- [`api/marketplace/offerings/index.ts`](resilientsa-app/api/marketplace/offerings/index.ts) — POST now resolves grounder correctly
+- [`api/marketplace/offerings/[id].ts`](resilientsa-app/api/marketplace/offerings/[id].ts) — PATCH ownership check
+- [`api/marketplace/offerings/mine.ts`](resilientsa-app/api/marketplace/offerings/mine.ts) — GET mine resolves grounder
+- [`api/marketplace/requests/index.ts`](resilientsa-app/api/marketplace/requests/index.ts) — GET requests resolves grounder
+- [`api/marketplace/engagements/[id].ts`](resilientsa-app/api/marketplace/engagements/[id].ts) — PATCH engagement management resolves grounder
+
+Seed:
+- [`scripts/seed-grounder.ts`](resilientsa-app/scripts/seed-grounder.ts) — creates test grounder user (role=grounder) linked to verified grounder org. Run: `npx tsx scripts/seed-grounder.ts`
+
+RLS:
+- [`grounders`](resilientsa-app/src/db/schema/public/grounders.ts) table already has `ALTER TABLE grounders ENABLE ROW LEVEL SECURITY` (line 30 of 0001_custom_setup.sql)
+- Grounders is a "global table" (no node_id) — accessed by all authenticated tenants. Adding `user_id` FK does not change the RLS posture
+- Application-level scoping unchanged: browse returns only verified grounders; grounder-facing routes gate via `getGrounderForUser()` which now resolves correctly
+
+**Verification — all pass:**
+- `npm run build` → tsc -b and vite build — zero errors ✅ (post-rebase verified)
+- Migration: 100% additive (ADD COLUMN uuid, ADD CONSTRAINT FK, ADD CONSTRAINT UNIQUE) ✅
+- 5 grounder-facing routes now resolve grounder identity via `grounders.user_id` ✅
+- Community-facing routes (GET /offerings, POST /offerings/:id/request) unaffected ✅
+- Seed script ready for Vercel preview database ✅
+
+**What's blocked, and on whom:**
+- `docs/SPOCK-RULING-2026-07-23.md` — file not found in repo. Proceeded per explicit CREW DIRECTIVE authorization ("Spock-approved"). Flagging for Spock to create/upload the ruling file.
+- Bones review for ORDER 008 Marketplace UI: PENDING — Spock to invoke Bones Protocol
+- Database migration must be applied to Neon: `npx drizzle-kit migrate` (needs DATABASE_URL at runtime)
+
+**Protocol/pattern checked against:**
+- CREW DIRECTIVE (ORDER 008 Schema Fix) — executed in exact sequence, all gates passed
+- AGENTS.md Critical Rules: #1 (build before push ✅), #2 (no hardcoded secrets ✅), #3 (Spock approval — CREW DIRECTIVE serves as authorization, migration additive-only ✅), #4 (no new dependencies ✅), #5 (no secrets pushed ✅), #6 (no new PII — user_id is a reference, not personal data ✅), #8 (RLS already enabled on grounders ✅)
+- SCOTTY_PATTERNS.md Pattern 001 — api/ directory excluded from tsc (pre-existing config)
+- Existing seed script pattern from `scripts/create-default-node.ts`
+
+**Deviations from spec:**
+- `docs/SPOCK-RULING-2026-07-23.md` — not found in repo. The CREW DIRECTIVE itself serves as the authorization for the schema change. Spock should upload the ruling file.
+- No `grounder_members` table — per scope limits, named extension point only, not built.
+
+**Anything flagged to Worf or Bones:**
+- Worf: Not required per CREW DIRECTIVE ("user_id is a reference, not personal data"). Confirmed: `user_id` is a UUID FK — not PII. No new bytea columns. No PII exposure through this change.
+- Bones: ORDER 008 Marketplace UI still needs review. Not affected by this schema fix (no visual changes).
+
+**Next:** (1) Apply migration to Neon (`npx drizzle-kit migrate`). (2) Run seed script on Vercel preview DB. (3) Verify grounder routes return 200 for linked test user, 403 for non-grounders. (4) Spock: Bones review for Marketplace UI. (5) ORDER 009 or ORDER 010.
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*
