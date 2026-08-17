@@ -617,6 +617,60 @@ RLS:
 
 ---
 
+### Session — 2026-08-17 (ORDER 008 Schema Fix — Live Verification + Delivery)
+
+**What I worked on:**
+- Re-verified the ORDER 008 schema fix state end-to-end and delivered the outstanding live-DB steps (migration apply → seed → route verification) per the CREW DIRECTIVE, using the Captain-authorized committed connection string.
+
+**What's now complete and where it lives:**
+- Schema fix (already committed `2834776` + standup `7ca6de3`): [`grounders.ts:6`](resilientsa-app/src/db/schema/public/grounders.ts:6) — `user_id uuid` (nullable, unique, FK→users.id); [`users.ts:26`](resilientsa-app/src/db/schema/public/users.ts:26) — `'grounder'` added to `role` enum. Verified in repo.
+- Migration gate: [`0003_steep_sinister_six.sql`](resilientsa-app/drizzle/migrations/0003_steep_sinister_six.sql:1) is purely additive (ADD COLUMN + 2× ADD CONSTRAINT; no DROP/ALTER/row rewrite). PASS.
+- Migration **applied to Neon** — confirmed `grounders.user_id` column (nullable), FK `grounders_user_id_users_id_fk`, UNIQUE `grounders_user_id_unique` all present. (Project applies migrations via custom scripts — no `__drizzle_migrations` table exists.)
+- [`getGrounderForUser()`](resilientsa-app/api/_lib/grounder.ts:7) resolves session user's grounder record via `grounders.user_id`; null-return TODO removed.
+- All 5 grounder-facing marketplace functions import the shared helper (no local stubs): [`offerings/index.ts`](resilientsa-app/api/marketplace/offerings/index.ts:6), [`offerings/mine.ts`](resilientsa-app/api/marketplace/offerings/mine.ts:6), [`requests/index.ts`](resilientsa-app/api/marketplace/requests/index.ts:7), [`engagements/[id].ts`](resilientsa-app/api/marketplace/engagements/[id].ts:7), [`offerings/[id].ts`](resilientsa-app/api/marketplace/offerings/[id].ts:6).
+- Cleaned up stale "Schema gap: grounders table needs user_id FK" error message in [`offerings/index.ts`](resilientsa-app/api/marketplace/offerings/index.ts:95) — schema gap is resolved, message now reads "Only Grounders can create offerings."
+- Seed: [`scripts/seed-grounder.ts`](resilientsa-app/scripts/seed-grounder.ts) links test grounder org (verified) to test user (role=grounder). Confirmed in DB: `user 11111111-1111-1111-1111-111111111111` (role=grounder) ↔ `grounder 22222222-2222-2222-2222-222222222222` (verified).
+- New verification script: [`scripts/verify-grounder-routes.ts`](resilientsa-app/scripts/verify-grounder-routes.ts) — applies additive migration if missing, seeds grounder user/org, creates session tokens, invokes real handlers with mock req/res.
+- RLS: `grounders` RLS already enabled ([`0001_custom_setup.sql:30`](resilientsa-app/drizzle/migrations/0001_custom_setup.sql:30)); adding `user_id` FK does not change RLS posture (global table, no node_id). Grounders only access aggregate offering data — never individual member data.
+
+**Route verification — all pass (8/8):**
+
+| Route | Grounder | Non-grounder |
+|---|---|---|
+| POST /marketplace/offerings | ✅ 201 | ✅ 403 |
+| GET /marketplace/offerings/mine | ✅ 200 | ✅ 403 |
+| GET /marketplace/requests | ✅ 200 | ✅ 403 |
+| PATCH /marketplace/engagements/:id | ✅ 200 | ✅ 403 |
+
+**Verification — all pass:**
+- `npm run build` → tsc -b and vite build — zero errors ✅
+- Migration 0003 applied to Neon ✅
+- Test grounder user + org linked, exercisable ✅
+- Grounder routes 200-path for linked user, 403 for non-grounders ✅
+
+**What's blocked, and on whom:**
+- **Vercel deployment env is missing DATABASE_URL/POSTGRES_URL.** `vercel env ls` shows no env vars on the `resilientsa` project, and recent production deploys are `● Error`. The `resilientsa-app.vercel.app` alias referenced in earlier standups now returns 404. **Live preview route verification could not be done against the deployed environment** — route verification was performed by invoking the real serverless handlers against Neon locally. On Captain: restore DATABASE_URL/ENCRYPTION_KEY (+ POSTGRES_URL for the `@vercel/postgres` client) to the Vercel project so the preview can connect.
+- **Hardcoded DB credential (High severity):** [`scripts/test-listings-api.ts:5`](resilientsa-app/scripts/test-listings-api.ts:5) contains a hardcoded Neon connection string. Flagged to Worf in [`WORF_ALERTS/2026-08-17-order008-hardcoded-db-url.md`](WORF_ALERTS/2026-08-17-order008-hardcoded-db-url.md). Captain-authorized for this session's one-off use; credential rotation + removal required before next production-data cycle. Do not reuse.
+- Bones review for ORDER 008 Marketplace UI: PENDING — Spock to invoke Bones Protocol.
+
+**Protocol/pattern checked against:**
+- CREW DIRECTIVE (ORDER 008 Schema Fix) — executed in exact sequence; all gates passed
+- AGENTS.md Critical Rules: #1 (build before push ✅), #2 (no new hardcoded secrets introduced; pre-existing leak flagged ✅), #3 (Spock approval via [`docs/SPOCK-RULING-2026-07-23.md`](docs/SPOCK-RULING-2026-07-23.md) Section 2 ✅), #4 (no new dependencies ✅), #5 (.env.local gitignored via `*.local` + `.env*`, not tracked ✅), #6 (no new PII — `user_id` is a UUID reference, not personal data ✅), #8 (RLS on grounders unchanged ✅)
+- [`SCOTTY_PATTERNS.md`](SCOTTY_PATTERNS.md) Pattern 001 — `api/` excluded from tsc; scripts/ excluded too (IDE type warnings on mock req are cosmetic)
+- SPOCK RULING Section 2 conditions: user_id nullable+unique ✅, purely additive migration ✅, no `grounder_members` table built (named extension point only) ✅, role single-valued (grounder) ✅
+
+**Deviations from spec:**
+- Migration applied via direct SQL (idempotent, additive-only) rather than `npx drizzle-kit migrate` — the project uses custom-script migration application (no `__drizzle_migrations` table), consistent with prior orders.
+- Route verification ran against Neon via the real serverless handlers with mock req/res (local), because the deployed Vercel environment lacks DB env vars and recent deploys are Error.
+
+**Anything flagged to Worf or Bones:**
+- Worf: NEW ALERT — [`WORF_ALERTS/2026-08-17-order008-hardcoded-db-url.md`](WORF_ALERTS/2026-08-17-order008-hardcoded-db-url.md) — High severity: hardcoded Neon DATABASE_URL in [`test-listings-api.ts`](resilientsa-app/scripts/test-listings-api.ts:5). Credential rotation + removal required. Does not block this schema fix (no new PII, no RLS regression).
+- Bones: ORDER 008 Marketplace UI review still pending (Spock to invoke).
+
+**Next:** (1) Captain: restore DATABASE_URL/ENCRYPTION_KEY/POSTGRES_URL on Vercel + rotate the leaked Neon credential. (2) O'Brien: replace hardcoded DB_URL in test-listings-api.ts with env var once rotation confirmed. (3) Verify deployed preview routes once env restored. (4) Spock: Bones review. (5) ORDER 009 or ORDER 010.
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*

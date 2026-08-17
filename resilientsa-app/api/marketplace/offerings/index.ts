@@ -92,7 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'POST') {
     const grounder = await getGrounderForUser(session.userId)
     if (!grounder) {
-      return res.status(403).json({ error: 'Only verified Grounders can create offerings. Schema gap: grounders table needs user_id FK.' })
+      return res.status(403).json({ error: 'Only Grounders can create offerings.' })
     }
     if (grounder.verificationStatus !== 'verified') {
       return res.status(403).json({ error: 'Your Grounder account is not yet verified.' })
