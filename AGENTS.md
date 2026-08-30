@@ -38,7 +38,8 @@ Working directory: `resilientsa-app/`
 6. All PII fields (phone_number, id_number, full_name, address, email) must be bytea (pgcrypto encrypted) — never plain text
 7. FoundingMember table must live in coop_pii schema, not public
 8. RLS must be enabled on every table in both public and coop_pii schemas
-9. Update OBRIEN_STANDUP.md at end of every session — no exceptions
+9. **ENCRYPTION_KEY is one-time, pre-pilot-only.** It may be generated or rotated freely while the database contains only test/seed data. The MOMENT any real community member's phone number is encrypted under it, ENCRYPTION_KEY becomes permanent for the life of the mission — rotating it after that point makes every existing member's phone hash (and therefore their login) unrecoverable, with no migration path. Before ORDER that enables real member onboarding, Spock must confirm ENCRYPTION_KEY is in a Captain-controlled password manager, not just Vercel env. No agent may regenerate ENCRYPTION_KEY once real PII exists without a full data-migration plan approved by Spock and the Captain.
+10. Update OBRIEN_STANDUP.md at end of every session — no exceptions
 
 ### Session Start Protocol
 1. Read the active CREW_ORDER in full
