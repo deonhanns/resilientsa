@@ -671,6 +671,51 @@ RLS:
 
 ---
 
+### Session — 2026-08-30 (ORDER 008 Schema Fix — Re-issued CREW DIRECTIVE, Re-verification)
+
+**What I worked on:**
+- CREW DIRECTIVE (ORDER 008 Schema Fix, Spock-approved) re-issued. Re-verified the full order end-to-end against current repo + live Neon state rather than assuming prior completion still holds.
+
+**What's now complete and where it lives:**
+- Repo state: clean at `fca46b7` on `main` — all ORDER 008 schema-fix work already committed (`2834776` schema, `7ca6de3` standup, `fca46b7` delivery).
+- Schema verified: [`grounders.ts:6`](resilientsa-app/src/db/schema/public/grounders.ts:6) `user_id` (nullable, unique, FK→users.id); [`users.ts:26`](resilientsa-app/src/db/schema/public/users.ts:26) role enum includes `'grounder'`.
+- Migration gate: [`0003_steep_sinister_six.sql`](resilientsa-app/drizzle/migrations/0003_steep_sinister_six.sql:1) purely additive (ADD COLUMN + 2× ADD CONSTRAINT). Already applied to Neon.
+- [`getGrounderForUser()`](resilientsa-app/api/_lib/grounder.ts:7) resolves via `grounders.user_id`; no TODO.
+- RLS on `grounders` unchanged (global table, no node_id) — aggregate-only access maintained.
+- **Script fix:** [`verify-grounder-routes.ts`](resilientsa-app/scripts/verify-grounder-routes.ts) made idempotent — the PATCH-engagement test now resets the test engagement to `requested` on conflict (`ON CONFLICT(id) DO UPDATE SET status='requested', started_at=NULL, completed_at=NULL`), so re-runs no longer hit a stale `accepted→accepted` 409.
+
+**Route verification — all pass (8/8):**
+
+| Route | Grounder | Non-grounder |
+|---|---|---|
+| POST /marketplace/offerings | ✅ 201 | ✅ 403 |
+| GET /marketplace/offerings/mine | ✅ 200 | ✅ 403 |
+| GET /marketplace/requests | ✅ 200 | ✅ 403 |
+| PATCH /marketplace/engagements/:id | ✅ 200 | ✅ 403 |
+
+**Verification — all pass:**
+- `npm run build` → tsc -b && vite build — zero errors ✅
+- Migration 0003 already applied to Neon ✅
+- Seed linked: test grounder user (role=grounder) ↔ verified grounder org ✅
+- Grounder routes 200-path for linked user, 403 for non-grounders ✅
+
+**What's blocked, and on whom:**
+- **Vercel deployment env still missing** `DATABASE_URL`/`POSTGRES_URL`/`ENCRYPTION_KEY` (`vercel env ls` → none). Deployed preview remains Error/SSO-gated. On Captain to restore env + rotate leaked credential (per [`WORF_ALERTS/2026-08-17-order008-hardcoded-db-url.md`](WORF_ALERTS/2026-08-17-order008-hardcoded-db-url.md)).
+- Bones review for ORDER 008 UI: PENDING.
+
+**Protocol/pattern checked against:**
+- CREW DIRECTIVE (ORDER 008 Schema Fix) — all gates re-passed
+- AGENTS.md Critical Rules #1–#8 — no violations surfaced; no new PII (`user_id` is a UUID reference)
+- [`SCOTTY_PATTERNS.md`](SCOTTY_PATTERNS.md) Pattern 001 — `scripts/`+`api/` excluded from `tsc -b`; IDE mock-req type warnings cosmetic
+
+**Anything flagged to Worf or Bones:**
+- Worf: prior alert stands — hardcoded Neon credential in [`test-listings-api.ts:5`](resilientsa-app/scripts/test-listings-api.ts:5) awaiting rotation/removal.
+- Bones: ORDER 008 Marketplace UI review pending.
+
+**Next:** (1) Captain: restore Vercel env vars + rotate credential. (2) Replace hardcoded DB_URL with env var post-rotation. (3) Verify deployed preview. (4) Bones review. (5) ORDER 009/010.
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*

@@ -187,10 +187,10 @@ async function main() {
     await c2.query(
       `INSERT INTO offering_engagements(id, offering_id, node_id, status, request_context)
        VALUES($1, $2, $3, 'requested', '40 households need water')
-       ON CONFLICT(id) DO NOTHING`,
+       ON CONFLICT(id) DO UPDATE SET status='requested', started_at=NULL, completed_at=NULL`,
       [engagementId, offeringId, DEFAULT_NODE_ID]
     )
-    console.log('Test engagement created for PATCH path ✅')
+    console.log('Test engagement reset to requested for PATCH path ✅')
   }
   await c2.end()
 
