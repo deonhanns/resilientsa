@@ -716,6 +716,70 @@ RLS:
 
 ---
 
+### Session — 2026-08-30 (ORDER 008 — Serverless Function Consolidation, Spock-approved)
+
+**What I worked on:**
+- Resolved the Vercel Hobby plan deploy blocker (max 12 serverless functions per deployment; project had 19). Per Spock ruling, consolidated the multi-route handler files into per-domain catch-all functions. **19 → 7 functions** (5 headroom for ORDER 009/010).
+- Also verified the newly-added Vercel env vars (DATABASE_URL/POSTGRES_URL/ENCRYPTION_KEY in Production + Preview).
+
+**What's now complete and where it lives:**
+
+Consolidated catch-alls (one Vercel function per domain, internal dispatch on `req.query.path`):
+- [`api/auth/[...path].ts`](resilientsa-app/api/auth/[...path].ts) — `request-code`, `verify-code` (was 2 files)
+- [`api/listings/[...path].ts`](resilientsa-app/api/listings/[...path].ts) — `GET/POST /listings`, `PATCH/DELETE /listings/:id` (was 2 files)
+- [`api/marketplace/[...path].ts`](resilientsa-app/api/marketplace/[...path].ts) — offerings browse/create, offerings/mine, offerings/:id PATCH, offerings/:id/request, requests, engagements/:id PATCH, engagements/:id/endorse (was 7 files)
+- [`api/matches/[...path].ts`](resilientsa-app/api/matches/[...path].ts) — matches GET/POST, :id/confirm, :id/decline (was 3 files)
+- [`api/steward/[...path].ts`](resilientsa-app/api/steward/[...path].ts) — dashboard, isolates, hubs (was 3 files)
+
+Kept single-file: [`api/gifts-profile/me.ts`](resilientsa-app/api/gifts-profile/me.ts), [`api/trade-completions/[match_id]/confirm-fairness.ts`](resilientsa-app/api/trade-completions/[match_id]/confirm-fairness.ts).
+
+**Routing change — old files → new internal dispatch (frontend URLs unchanged):**
+| Public path | Old handler file | New dispatch (path segments) |
+|---|---|---|
+| `POST /api/auth/request-code` | `auth/request-code.ts` | `auth/[...path].ts` → `['request-code']` |
+| `POST /api/auth/verify-code` | `auth/verify-code.ts` | `auth/[...path].ts` → `['verify-code']` |
+| `GET/POST /api/listings` | `listings/index.ts` | `listings/[...path].ts` → `[]` |
+| `PATCH/DELETE /api/listings/:id` | `listings/[id].ts` | `listings/[...path].ts` → `[':id']` |
+| `GET/POST /api/marketplace/offerings` | `marketplace/offerings/index.ts` | `marketplace/[...path].ts` → `['offerings']` |
+| `GET /api/marketplace/offerings/mine` | `marketplace/offerings/mine.ts` | → `['offerings','mine']` |
+| `PATCH /api/marketplace/offerings/:id` | `marketplace/offerings/[id].ts` | → `['offerings',':id']` |
+| `POST /api/marketplace/offerings/:id/request` | `marketplace/offerings/[id]/request.ts` | → `['offerings',':id','request']` |
+| `GET /api/marketplace/requests` | `marketplace/requests/index.ts` | → `['requests']` |
+| `PATCH /api/marketplace/engagements/:id` | `marketplace/engagements/[id].ts` | → `['engagements',':id']` |
+| `POST /api/marketplace/engagements/:id/endorse` | `marketplace/engagements/[id]/endorse.ts` | → `['engagements',':id','endorse']` |
+| `GET/POST /api/matches` | `matches/index.ts` | `matches/[...path].ts` → `[]` |
+| `PATCH /api/matches/:id/confirm` | `matches/[id]/confirm.ts` | → `[':id','confirm']` |
+| `PATCH /api/matches/:id/decline` | `matches/[id]/decline.ts` | → `[':id','decline']` |
+| `GET /api/steward/dashboard/:cellId` | `steward/dashboard/[cell_id].ts` | `steward/[...path].ts` → `['dashboard',':cellId']` |
+| `GET /api/steward/isolates/:cellId` | `steward/isolates/[cell_id].ts` | → `['isolates',':cellId']` |
+| `GET /api/steward/hubs/:cellId` | `steward/hubs/[cell_id].ts` | → `['hubs',':cellId']` |
+
+All business logic preserved verbatim (same imports, same queries, same RLS context, same role gates). Frontend [`api.ts`](resilientsa-app/src/lib/api.ts) calls unchanged.
+
+**Verification:**
+- `npm run build` → tsc -b && vite build — zero errors ✅
+- Smoke test: all 5 catch-alls import cleanly (default handler present) ✅
+- Function count: 7 (< 12 Hobby limit, 5 headroom) ✅
+- No external imports of deleted handler files remain ✅
+
+**What's blocked, and on whom:**
+- **Vercel env vars are PLACEHOLDERS, not real rotated credentials.** `vercel env pull` returns `DATABASE_URL`/`POSTGRES_URL`/`ENCRYPTION_KEY` values of length ~13 that resolve to host `"base"` (`getaddrinfo ENOTFOUND base`). `.env.local`'s `DATABASE_URL` (len 16) is also a placeholder. **On Captain:** populate the real rotated Neon connection string + encryption key into Vercel (Production + Preview) and `.env.local`. Seed (`seed-grounder.ts`) and route verification (`verify-grounder-routes.ts`) **cannot run** until a real DATABASE_URL is present.
+- `AT_API_KEY`/`AT_USERNAME` not present in pulled Vercel preview env (auth handler imports `_lib/at` at module load — pre-existing, not a regression; on Captain to restore for OTP).
+- Redeploy of the consolidation itself (function-count fix) is still to be confirmed once committed.
+
+**Protocol/pattern checked against:**
+- Spock ruling (function consolidation approved, no Scotty escalation — documented in this session)
+- AGENTS.md Critical Rules: #1 (build before push ✅), #3 (no schema change ✅), #4 (no new deps ✅), #5 (no secrets pushed ✅), #6 (no PII ✅)
+- [`SCOTTY_PATTERNS.md`](SCOTTY_PATTERNS.md) Pattern 001 — api/ excluded from tsc; catch-all `[...path].ts` is Vercel-native, no rewrites needed
+
+**Anything flagged to Worf or Bones:**
+- Worf: no new PII; consolidation moves no data logic. Prior hardcoded-credential alert stands.
+- Bones: ORDER 008 UI review pending (no UI changes here).
+
+**Next:** (1) Captain: populate real rotated DATABASE_URL/POSTGRES_URL/ENCRYPTION_KEY + AT vars on Vercel. (2) Redeploy (this consolidation unblocks the 12-function gate). (3) Re-run seed + verify-grounder-routes with real creds. (4) Confirm preview reachable. (5) Bones review.
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*

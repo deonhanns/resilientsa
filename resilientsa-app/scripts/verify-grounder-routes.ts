@@ -120,11 +120,12 @@ async function main() {
   console.log('Session tokens created ✅')
   await c.end()
 
-  // ---- 4. Invoke real handlers ----
-  const { default: offeringsHandler } = await import('../api/marketplace/offerings/index.ts')
-  const { default: mineHandler } = await import('../api/marketplace/offerings/mine.ts')
-  const { default: requestsHandler } = await import('../api/marketplace/requests/index.ts')
-  const { default: engagementHandler } = await import('../api/marketplace/engagements/[id].ts')
+  // ---- 4. Invoke real handlers (consolidated marketplace catch-all) ----
+  const { default: marketplaceHandler } = await import('../api/marketplace/[...path].ts')
+  const offeringsHandler = marketplaceHandler
+  const mineHandler = marketplaceHandler
+  const requestsHandler = marketplaceHandler
+  const engagementHandler = marketplaceHandler
 
   const authGrounder = { authorization: `Bearer ${GROUNDER_TOKEN}` }
   const authMember = { authorization: `Bearer ${MEMBER_TOKEN}` }
@@ -142,6 +143,7 @@ async function main() {
   await offeringsHandler(
     mockReq({
       method: 'POST',
+      query: { path: ['offerings'] },
       headers: authGrounder,
       body: {
         name: 'Water Kiosk Programme',
@@ -156,27 +158,27 @@ async function main() {
 
   const createMember = mockRes()
   await offeringsHandler(
-    mockReq({ method: 'POST', headers: authMember, body: { name: 'X', pillarTags: ['food'] } }),
+    mockReq({ method: 'POST', query: { path: ['offerings'] }, headers: authMember, body: { name: 'X', pillarTags: ['food'] } }),
     createMember.res
   )
   check('POST /offerings (non-grounder)', 403, createMember.state.statusCode)
 
   // GET /marketplace/offerings/mine
   const mineGrounder = mockRes()
-  await mineHandler(mockReq({ method: 'GET', headers: authGrounder }), mineGrounder.res)
+  await mineHandler(mockReq({ method: 'GET', query: { path: ['offerings', 'mine'] }, headers: authGrounder }), mineGrounder.res)
   check('GET /offerings/mine (grounder)', 200, mineGrounder.state.statusCode)
 
   const mineMember = mockRes()
-  await mineHandler(mockReq({ method: 'GET', headers: authMember }), mineMember.res)
+  await mineHandler(mockReq({ method: 'GET', query: { path: ['offerings', 'mine'] }, headers: authMember }), mineMember.res)
   check('GET /offerings/mine (non-grounder)', 403, mineMember.state.statusCode)
 
   // GET /marketplace/requests
   const reqGrounder = mockRes()
-  await requestsHandler(mockReq({ method: 'GET', headers: authGrounder }), reqGrounder.res)
+  await requestsHandler(mockReq({ method: 'GET', query: { path: ['requests'] }, headers: authGrounder }), reqGrounder.res)
   check('GET /requests (grounder)', 200, reqGrounder.state.statusCode)
 
   const reqMember = mockRes()
-  await requestsHandler(mockReq({ method: 'GET', headers: authMember }), reqMember.res)
+  await requestsHandler(mockReq({ method: 'GET', query: { path: ['requests'] }, headers: authMember }), reqMember.res)
   check('GET /requests (non-grounder)', 403, reqMember.state.statusCode)
 
   // PATCH /marketplace/engagements/:id — need an engagement on the grounder's offering
@@ -196,14 +198,14 @@ async function main() {
 
   const engGrounder = mockRes()
   await engagementHandler(
-    mockReq({ method: 'PATCH', query: { id: engagementId }, headers: authGrounder, body: { status: 'accepted' } }),
+    mockReq({ method: 'PATCH', query: { path: ['engagements', engagementId] }, headers: authGrounder, body: { status: 'accepted' } }),
     engGrounder.res
   )
   check('PATCH /engagements/:id (grounder)', 200, engGrounder.state.statusCode, JSON.stringify(engGrounder.state.body)?.slice(0, 120))
 
   const engMember = mockRes()
   await engagementHandler(
-    mockReq({ method: 'PATCH', query: { id: engagementId }, headers: authMember, body: { status: 'accepted' } }),
+    mockReq({ method: 'PATCH', query: { path: ['engagements', engagementId] }, headers: authMember, body: { status: 'accepted' } }),
     engMember.res
   )
   check('PATCH /engagements/:id (non-grounder)', 403, engMember.state.statusCode)
