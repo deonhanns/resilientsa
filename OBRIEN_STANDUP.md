@@ -761,6 +761,7 @@ All business logic preserved verbatim (same imports, same queries, same RLS cont
 - Smoke test: all 5 catch-alls import cleanly (default handler present) ✅
 - Function count: 7 (< 12 Hobby limit, 5 headroom) ✅
 - No external imports of deleted handler files remain ✅
+- **Deployment: `● Ready`** — pushed `7312faf`; Vercel auto-deploy completed (75 modules, 12s build cache, status Ready). The 12-function Hobby gate is resolved. ✅
 
 **What's blocked, and on whom:**
 - **Vercel env vars are PLACEHOLDERS, not real rotated credentials.** `vercel env pull` returns `DATABASE_URL`/`POSTGRES_URL`/`ENCRYPTION_KEY` values of length ~13 that resolve to host `"base"` (`getaddrinfo ENOTFOUND base`). `.env.local`'s `DATABASE_URL` (len 16) is also a placeholder. **On Captain:** populate the real rotated Neon connection string + encryption key into Vercel (Production + Preview) and `.env.local`. Seed (`seed-grounder.ts`) and route verification (`verify-grounder-routes.ts`) **cannot run** until a real DATABASE_URL is present.
