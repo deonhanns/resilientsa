@@ -91,4 +91,51 @@ Replaced the `NODE_ENV` check with an explicit opt-in: `OTP_DEBUG_LOG === 'true'
 
 ---
 
+## Pattern 004 — Module Type Boundary Doesn't Stop at `api/` (ERR_REQUIRE_ESM)
+**Escalation date:** 2026-09-06
+**Resolved by:** Spock
+
+### Problem
+After Pattern 002's fix (`api/package.json`), the next deploy crashed differently: `Error [ERR_REQUIRE_ESM]: require() of ES Module /var/task/resilientsa-app/src/db/index.js from /var/task/resilientsa-app/api/_lib/db.js not supported.`
+
+### Root Cause
+`api/package.json` scopes CommonJS runtime interpretation to the `api/` directory tree only. But `api/_lib/db.ts` imports from `../../src/db/index` — a **sibling** directory, not a descendant of `api/`. Node resolves a required file's module type from the nearest `package.json` to *that file's own location*, not the importing file's. For `src/db/index.js`, that nearest ancestor is the root `resilientsa-app/package.json` (`"type": "module"`) — `api/package.json` never enters into it. Same disease as Pattern 002, one directory over.
+
+### Resolution
+Added [`resilientsa-app/src/package.json`](resilientsa-app/src/package.json) with `"type": "commonjs"`, mirroring the `api/` fix for the `src/` tree. Verified every `api/` file's cross-boundary import (`grep` for `from '\.\./\.\./`) resolves to either `api/_lib/*` (covered by `api/package.json`) or `src/db/*` (covered by this new file) — no other sibling directories are reached from `api/`.
+
+### Do NOT
+- Assume fixing the module-type boundary once (Pattern 002) covers every directory the API code imports from — check **every** cross-boundary import path, not just the first one that crashes
+- Add `"type": "commonjs"` to the root `resilientsa-app/package.json` instead — breaks the Vite frontend build, which needs `"type": "module"`
+
+### Verification
+- `grep -rhoE "from ['\"]\.\./\.\./[a-zA-Z0-9_/.-]+['\"]" api --include="*.ts"` — confirm every result resolves under a directory that has its own `"type": "commonjs"` `package.json`, at any depth
+
+---
+
+## Pattern 005 — Crash-at-Import from Eager Third-Party Client Construction
+**Escalation date:** 2026-09-06
+**Resolved by:** Spock
+
+### Problem
+After Patterns 002–004 fixed the module-resolution crashes, the next deploy crashed with a *different* error at the same point: `[ValidationError]: "username" is required` — before any request logic ran, and before `requestCode`'s own `try/catch` around `sms.send()` ever executed.
+
+### Root Cause
+`api/_lib/at.ts` (and its twin `server/lib/at.ts`) called `AfricasTalking({ apiKey, username })` at **module top level** — executed once, at import time, the moment Vercel loads the function. The `africastalking` SDK validates its config synchronously in the constructor and **throws** if either field is `undefined`. With `AT_API_KEY`/`AT_USERNAME` not yet configured (pre-pilot), this threw during import, killing the entire serverless function process before the handler — and its already-correct `try/catch` fallback to `OTP_DEBUG_LOG` — ever got a chance to run.
+
+**Lesson:** a `try/catch` around the *call site* doesn't help if the *import* itself throws. Any third-party client that validates config eagerly at construction must be constructed lazily, inside a function, not at module scope — otherwise its failure mode is invisible to every caller, no matter how carefully they wrap their own call.
+
+### Resolution
+Changed `sms` from an eagerly-constructed client to a lazily-constructed one: the `AfricasTalking(...)` call now happens inside `getClient()`, called only when `sms.send()` is actually invoked. Missing credentials now throw *inside* the caller's existing `try/catch` in `requestCode`, which already falls back to `OTP_DEBUG_LOG` (Pattern 003) — no behavioural change needed at the call site.
+
+### Do NOT
+- Construct any third-party SDK client (SMS, payment, email, etc.) at module top level in `api/` or `server/lib/` if its config might be legitimately absent (e.g. pre-pilot, feature-flagged, environment-specific) — always defer construction into the function that uses it
+- Assume a passing local `npm run build` or even a `Ready` Vercel deployment proves the function *runs* — this class of bug only surfaces when the function is actually invoked with real (or missing) env vars, which build-time checks can't see
+
+### Verification
+- With `AT_API_KEY`/`AT_USERNAME` unset, hit `POST /api/auth/request-code` and confirm `OTP_DEBUG_LOG` fires (visible in Vercel Runtime Logs) instead of a process crash
+- Once real AT credentials are added, confirm `sms.send()` still succeeds through the lazy path (no regression)
+
+---
+
 *Patterns are added after each escalation resolution. O'Brien reads before every session.*
