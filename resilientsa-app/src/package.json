@@ -1,0 +1,6 @@
+{
+  "name": "resilientsa-src",
+  "private": true,
+  "type": "commonjs",
+  "description": "api/package.json scopes CommonJS to api/ only. But api/_lib/db.ts imports from src/db/, a sibling directory api/package.json does not cover. Node walks up from src/db/index.js looking for the nearest package.json and, without this file, finds the root's (type: module), causing ERR_REQUIRE_ESM at runtime when api/_lib/db.js requires it. This file scopes CommonJS runtime interpretation to src/ for the same reason api/package.json exists. See SCOTTY_PATTERNS.md Pattern 004. Does not affect the Vite frontend build, which bundles src/ through its own esbuild/Rollup pipeline rather than Node's native require() resolution."
+}
