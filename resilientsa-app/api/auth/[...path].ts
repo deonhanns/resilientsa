@@ -44,8 +44,16 @@ async function requestCode(req: VercelRequest, res: VercelResponse) {
         from:    process.env.AT_SENDER_ID ?? 'ResilientSA',
       })
     } catch (err) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log(`[SANDBOX] OTP for ${normalised}: ${code}`)
+      // Vercel sets NODE_ENV=production on both Production and Preview
+      // deployments, so `NODE_ENV !== 'production'` never fires there and
+      // silently swallows the OTP with no way to retrieve it. Gate on an
+      // explicit opt-in flag instead, checked via Vercel → Runtime Logs.
+      // PRE-PILOT TESTING ONLY. Per AGENTS.md Critical Rule #9's spirit:
+      // this must be unset (OTP_DEBUG_LOG must NOT be 'true') before any
+      // real community member's phone number is used to request a code —
+      // logging a real member's OTP is a live credential exposure.
+      if (process.env.NODE_ENV !== 'production' || process.env.OTP_DEBUG_LOG === 'true') {
+        console.log(`[OTP_DEBUG] code for ${normalised}: ${code} (AT send failed: ${(err as any)?.message ?? 'unknown'})`)
       }
     }
 
