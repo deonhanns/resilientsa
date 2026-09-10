@@ -1,17 +1,17 @@
 # MISSION STATUS
 **Mission:** ResilientSA
 **Custodian:** Spock
-**Status:** ACTIVE — build phase, 60% complete
+**Status:** ACTIVE — build phase, core loop live end-to-end on Vercel preview
 
 ---
 
 ## CURRENT PHASE
 
-**Build phase — 6 of 10 Crew Orders complete.** Core product experience is live on Vercel preview: community members can sign up, complete a Gifts Profile, browse and post listings on the Trade Exchange, and have a Cell Steward facilitate a match.
+**Build phase — 8 of 10 Crew Orders substantively built** (007 and 008 both pending Bones review before formal close). As of 2026-09-10, the full core loop works live: a real user can sign up via SMS OTP, complete a Gifts Profile, and see/post to the Trade Exchange — confirmed via live browser testing, not just code review.
 
-ORDER 007 (Cell Steward Dashboard) is ~85% complete — backend built and pushed, Bones review pending before it can be marked complete.
+**Crew configuration note:** O'Brien (DeepSeek/Kilo Code) has been offline (out of credits) since 2026-08-31, indefinite. Spock has been standing in directly for engineering work since 2026-09-10, per the interim note in `AGENTS.md`. This is a documented deviation, not a silent one — see `OBRIEN_STANDUP.md`'s 2026-09-10 entry for full detail and its own caveats about verification quality during this period.
 
-**Git credentials:** Resolved 2026-07-19. `deonhanns` authenticated via `gh` CLI on loan laptop. All local work now pushable.
+**Git credentials:** Resolved 2026-07-19, still holding.
 
 ---
 
@@ -22,43 +22,37 @@ ORDER 007 (Cell Steward Dashboard) is ~85% complete — backend built and pushed
 | 001 | Clickable Prototype | McCoy | ✅ COMPLETE |
 | 002 | Project Scaffold + Tokens + i18n | O'Brien | ✅ COMPLETE |
 | 003 | PostgreSQL Schema | O'Brien | ✅ COMPLETE |
-| 004 | Authentication | O'Brien | ✅ COMPLETE |
-| 005 | Gifts Profile | O'Brien | ✅ COMPLETE |
-| 006 | Trade Exchange | O'Brien | ✅ COMPLETE |
-| 007 | Cell Steward Dashboard + Batch Jobs | O'Brien | 🟡 IN PROGRESS — Bones review pending |
-| 008 | Community Marketplace | O'Brien | ⬜ READY — Crew Order issued, depends on 006 ✅ |
-| 009 | Notifications (SMS + WhatsApp) | O'Brien | ⬜ QUEUED — depends on 004, 006, 007 |
-| 010 | Crisis Mode + Resource Map | O'Brien | ⬜ QUEUED — depends on 006, 009 |
-
-Orders 007 and 008 can run in parallel. ORDER 008 can begin immediately.
+| 004 | Authentication | O'Brien | ✅ COMPLETE (live-verified end-to-end 2026-09-10) |
+| 005 | Gifts Profile | O'Brien | ✅ COMPLETE (live-verified end-to-end 2026-09-10) |
+| 006 | Trade Exchange | O'Brien | ✅ COMPLETE (live-verified 2026-09-10, `/api/me` cellId bug fixed) |
+| 007 | Cell Steward Dashboard + Batch Jobs | O'Brien | 🟡 Built, deferred sub-components now shipped (ORDER 007b) — **Bones review still pending, now finally do-able against the live app** |
+| 008 | Community Marketplace | O'Brien | 🟡 Built + schema fix delivered + live-verified (8/8 route checks pass) — **Bones review still pending** |
+| 009 | Notifications (SMS + WhatsApp) | O'Brien | ⬜ QUEUED — blocked behind ORDER 009a (see below) |
+| 010 | Crisis Mode + Resource Map | O'Brien | ⬜ QUEUED — depends on 006 ✅, 009 |
 
 ---
 
-## ORDER 007 — DETAIL
+## NEW FINDING — ORDER 009a NOT YET SPEC'D
 
-**What's done (pushed 2026-07-19):**
-- 5 API routes: dashboard aggregate, isolates, hubs, network-summary, log-offline-trade
-- Batch jobs: NetworkPhaseSnapshot (June Holley four-phase) + InternalForecast
-- StewardDashboard UI: NeedsRadar, NetworkSummary, MemberRow, reciprocity flags
+Discovered 2026-09-10 while tracing the dependency chain above cell assignment: **there is no product path anywhere in the code to create a node, create a cell, assign a Cell Steward, or grant `node_admin`.** Every signup is hardcoded into one placeholder node (`00000000-...0001`). Cells only exist via direct seed-script inserts. `/admin` is a literal unbuilt placeholder route.
 
-**What's pending before ORDER 007 is complete:**
-- Bones review of StewardDashboard UI — **required, not optional**
-- IsolateList.tsx, HubList.tsx, LogOfflineTrade.tsx — deferred sub-components
-- Steward i18n keys — not verified
+**Proposed: ORDER 009a — Node & Cell Formation**, sequenced *before* ORDER 009's SMS invite work (invites are meaningless without a real node/cell to invite someone into). Not yet spec'd — needs a dedicated bridge session. Captain sign-off pending.
 
 ---
 
 ## WHAT IS LIVE ON VERCEL PREVIEW
 
-`https://resilientsa-app.vercel.app`
+`https://resilientsa.vercel.app`
 
-- ✅ Auth (SMS OTP → session token)
-- ✅ Gifts Profile (three-question sequential)
-- ✅ Trade Exchange (listings, matches, fairness, offline outbox)
-- ✅ Cell Steward Dashboard API (backend only — Bones verdict pending)
-- ❌ Community Marketplace (ORDER 008 not started)
-- ❌ Notifications (ORDER 009 not started)
+- ✅ Auth (SMS OTP → session token) — live-verified end-to-end 2026-09-10
+- ✅ Gifts Profile (three-question sequential) — live-verified
+- ✅ Trade Exchange (listings, matches, fairness, offline outbox) — live-verified, `/api/me` cellId fix applied
+- 🟡 Cell Steward Dashboard (backend + UI both built, incl. IsolateList/HubList/LogOfflineTrade) — Bones verdict still pending
+- 🟡 Community Marketplace (backend + UI both built, grounder identity resolved) — Bones verdict still pending
+- ❌ Notifications (ORDER 009 not started — blocked on 009a)
 - ❌ Crisis Mode (ORDER 010 not started)
+- ❌ Node/Cell/Steward formation (no product path exists — this is the 009a finding)
+- ❌ Bottom navigation — `/trade`, `/support`, `/steward` are live routes with no UI to move between them; McCoy's `BottomNav` component exists in the design system but isn't wired into `App.tsx`
 
 Prototype (McCoy): `design/prototype-v1/ui_kits/resilientsa-app/index.html`
 
@@ -68,9 +62,13 @@ Prototype (McCoy): `design/prototype-v1/ui_kits/resilientsa-app/index.html`
 
 | Item | Priority | Status |
 |---|---|---|
-| Bones review — ORDER 007 StewardDashboard | 🔴 Immediate | Pending — Captain to share screenshots on bridge |
-| ORDER 008 (Community Marketplace) | 🔴 Immediate | Ready to issue to O'Brien |
-| IsolateList, HubList, LogOfflineTrade (ORDER 007 deferred) | 🟡 Before ORDER 007 close | O'Brien follow-up session |
+| Bones review — ORDER 007 StewardDashboard | 🔴 Immediate | Unblocked as of 2026-09-10 (live app now reachable) — not yet done |
+| Bones review — ORDER 008 Marketplace | 🔴 Immediate | Unblocked as of 2026-09-10 — not yet done |
+| ORDER 009a spec session (Node & Cell Formation) | 🔴 Immediate | Not yet spec'd — needs dedicated bridge session |
+| Wire in BottomNav | 🟡 Small, contained | Not started |
+| Assign Captain's test user a real `cellId` | 🟡 Quick | Not done — needed to see a populated Trade Exchange feed |
+| AT sender-ID registration (real SMS, not `OTP_DEBUG_LOG`) | 🟡 Should start now, long lead time | Not started — Captain action, SA mobile network lead time is days–weeks |
+| Hardcoded Neon credential in `test-listings-api.ts` | ✅ Resolved 2026-09-10 | Removed from source (swapped to `process.env.DATABASE_URL`); old password already rotated/inert; string remains in git history only |
 | Afrikaans professional translation review | 🟡 Pre-production | After ORDER 010 |
 | Facebook page live | 🟡 Captain action | Copy ready in `docs/facebook-page-copy-v1.0.md` |
 | First Cape Town RA/CPF relationship | 🟡 Captain action | After Bones-approved prototype shown |
@@ -78,7 +76,7 @@ Prototype (McCoy): `design/prototype-v1/ui_kits/resilientsa-app/index.html`
 | Cooperative Formation backend build | Phase 2 | Deferred |
 | Network Health full graph visualisation | Phase 2 | Data substrate built in ORDER 007 |
 | Voice/USSD interface | Phase 2 | Not started |
-| Node Admin dashboard | Phase 2 | Deferred post-pilot |
+| Node Admin dashboard | Phase 2 | Deferred post-pilot — this is now entangled with the ORDER 009a finding |
 
 ---
 
@@ -87,10 +85,11 @@ Prototype (McCoy): `design/prototype-v1/ui_kits/resilientsa-app/index.html`
 | File | Purpose | Updated by |
 |---|---|---|
 | `MISSION_STATUS.md` | Ground truth — current build state | Spock |
-| `OBRIEN_STANDUP.md` | Session log — what O'Brien built, blocked, flagged | O'Brien |
+| `OBRIEN_STANDUP.md` | Session log — what O'Brien (or Spock, interim) built, blocked, flagged | O'Brien / Spock (interim) |
 | `CHANGELOG.md` | What shipped per order — deployment record | O'Brien |
 | `BONES_VERDICT.md` | Design gate verdicts | McCoy / Spock |
 | `WORF_ALERTS/` | Security review verdicts | Worf |
+| `SCOTTY_PATTERNS.md` | Engineering pattern library — Patterns 001–007 documented | Scotty / Spock (interim) |
 | `ENGINEERING_ESCALATIONS/` | Blocked issue escalations | O'Brien → Scotty |
 | `CREW_ORDERS/` | Engineering specs | Spock |
 | `docs/` | Bridge documents — specs, strategy | Spock |
@@ -99,19 +98,20 @@ Prototype (McCoy): `design/prototype-v1/ui_kits/resilientsa-app/index.html`
 
 ## WORF FLAGS — OPEN
 
-*None — no Critical or High alerts outstanding.*
+*None Critical/High currently open.* Prior High alert (`2026-08-17-order008-hardcoded-db-url.md`) resolved this session — credential removed from source; already-rotated password remains inert in git history only.
 
 ---
 
 ## NEXT
 
-1. Bones review — StewardDashboard (Captain shares screenshots on bridge)
-2. Issue ORDER 008 to O'Brien (Community Marketplace)
-3. O'Brien follow-up — deferred ORDER 007 sub-components
-4. ORDER 009 after 007 fully closed
-5. ORDER 010 after 009
+1. Bones review — ORDER 007 StewardDashboard + ORDER 008 Marketplace, against the live app (both finally do-able now that login works)
+2. Design session — spec ORDER 009a (Node & Cell Formation)
+3. Assign Captain's test user a real `cellId`; wire in `BottomNav`
+4. Start AT sender-ID registration in parallel (long lead time — don't wait on the above)
+5. ORDER 009 (Notifications) after 009a lands
+6. ORDER 010 after 009
 
 ---
 
-*Last updated: 2026-07-19*
-*Next update: on ORDER 007 close or ORDER 008 complete*
+*Last updated: 2026-09-10 (Spock, interim engineering session)*
+*Next update: on ORDER 009a spec, or on first Bones verdict for 007/008*
