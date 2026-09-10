@@ -39,6 +39,7 @@ import type {
   GiftsProfile, StewardDashboard, IsolateList, HubsData, NetworkSummary,
   MarketplaceOfferingsResponse, GrounderOfferingsResponse,
   GrounderRequestsResponse, RequestResponse,
+  AdminNodesResponse, AdminCellsResponse, AdminMembersResponse,
 } from './types'
 
 export const giftsProfileApi = {
@@ -97,4 +98,20 @@ export const marketplaceApi = {
 
   endorse: (engagementId: string, recommend: boolean, note?: string, visibility?: string) =>
     api.post(`/marketplace/engagements/${engagementId}/endorse`, { recommend, note, visibility }),
+}
+
+export const adminApi = {
+  listNodes: () => api.get<AdminNodesResponse>('/admin/nodes'),
+  createNode: (data: { name: string; raCpfName?: string; initialAdminUserId: string }) =>
+    api.post<{ nodeId: string; adminUserId: string }>('/admin/nodes', data),
+
+  listCells: () => api.get<AdminCellsResponse>('/admin/cells'),
+  createCell: (name: string) =>
+    api.post<{ cellId: string }>('/admin/cells', { name }),
+
+  listMembers: () => api.get<AdminMembersResponse>('/admin/members'),
+  assignCell: (userId: string, cellId: string) =>
+    api.patch<{ ok: true }>(`/admin/members/${userId}/cell`, { cellId }),
+  setMemberRole: (userId: string, role: 'cell_steward' | 'member') =>
+    api.patch<{ ok: true; role: string }>(`/admin/members/${userId}/role`, { role }),
 }
