@@ -168,4 +168,31 @@ Applied identically to all 5 catch-all functions: `api/auth/`, `api/marketplace/
 
 ---
 
+## Pattern 007 — Double-Prefixed API Path Caused Permanent False Empty State
+**Escalation date:** 2026-09-10
+**Resolved by:** Spock
+
+### Problem
+Every real user landed on the Trade Exchange screen and saw "Your Cell Steward will add you to a cell soon" — regardless of whether they actually had a cell assigned. The message is legitimate copy for a genuinely cell-less user, but it was showing for everyone, permanently, hiding the entire Trade Exchange feed.
+
+### Root Cause
+`TradeExchange.tsx` called `api.get('/api/me')`. But the shared API client (`lib/api.ts`) already prepends `/api` to every path (`BASE_URL = '/api'`). The actual request therefore hit `/api/api/me` — doubly-prefixed, guaranteed 404 regardless of whether `/api/me` existed. It didn't, compounding the problem: **the endpoint was never built in the first place**, so even a correctly-pathed request would have failed.
+
+The `.catch()` swallowed the failure silently and left `cellId` as `null` forever, which is the exact same state as a real user genuinely awaiting cell assignment — making the bug indistinguishable from correct behaviour without reading the network tab.
+
+### Resolution
+1. Built the missing `/api/me` endpoint — returns the session user's own `cellId`, `nodeId`, `role`, `displayName` from the `users` table.
+2. Extended `api/_lib/session.ts`'s `SessionContext` to include `cellId` (was previously omitted, forcing every caller needing it to hit the database again).
+3. Fixed `TradeExchange.tsx` to call `api.get('/me')` (correct — the client's own `/api` prefix makes this resolve to `/api/me`) and to actually read `me.cellId` from the response instead of hardcoding the string `'default'`.
+
+### Do NOT
+- Call `api.get()`/`api.post()` etc. with a path that already starts with `/api` — the shared client in `lib/api.ts` adds that prefix automatically. Check `BASE_URL` before assuming a path is correct.
+- Trust a screen's "empty" or "not yet" state at face value — for any screen driven by an API call wrapped in try/catch, check whether the empty state is real data or a swallowed fetch failure before assuming it describes the user's actual condition.
+
+### Verification
+- Log in as a real user with a `cellId` set in the database and confirm the Trade Exchange feed loads (not the "no cell yet" message)
+- Log in as a user with `cellId = null` and confirm the "no cell yet" message still shows correctly — it's valid copy for that real state, just no longer permanently wrong for everyone else
+
+---
+
 *Patterns are added after each escalation resolution. O'Brien reads before every session.*
