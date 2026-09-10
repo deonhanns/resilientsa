@@ -56,9 +56,14 @@ export default function TradeExchange() {
       setLoading(false)
       return
     }
-    api.get<{ nodeId?: string }>('/api/me')
-      .then(() => {
-        setCellId('default')
+    api.get<{ cellId?: string | null }>('/me')
+      .then((me) => {
+        if (me.cellId) {
+          setCellId(me.cellId)
+        } else {
+          // Genuinely no cell yet — real state, not a fetch failure.
+          setLoading(false)
+        }
       })
       .catch(() => setLoading(false))
   }, [])

@@ -10,6 +10,7 @@ export interface SessionContext {
   userId: string
   userRole: string
   nodeId: string
+  cellId: string | null
 }
 
 export async function getSession(req: VercelRequest): Promise<SessionContext | null> {
@@ -17,7 +18,7 @@ export async function getSession(req: VercelRequest): Promise<SessionContext | n
   if (!token) return null
 
   const [session] = await db
-    .select({ userId: sessionTokens.userId, role: users.role, nodeId: users.nodeId })
+    .select({ userId: sessionTokens.userId, role: users.role, nodeId: users.nodeId, cellId: users.cellId })
     .from(sessionTokens)
     .innerJoin(users, eq(sessionTokens.userId, users.id))
     .where(and(eq(sessionTokens.token, token), gt(sessionTokens.expiresAt, new Date())))
@@ -29,6 +30,7 @@ export async function getSession(req: VercelRequest): Promise<SessionContext | n
     userId:   session.userId,
     userRole: session.role ?? 'member',
     nodeId:   session.nodeId ?? '',
+    cellId:   session.cellId ?? null,
   }
 }
 
