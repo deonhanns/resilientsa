@@ -137,3 +137,91 @@ Full Trade Exchange screen: listing feed with cards, filter tabs, pillar filter 
 2. **Afrikaans translations**: English fallback values — same as all previous orders. Acknowledged, not blocking.
 
 **Bones sign-off: CONDITIONAL PASS — merge when icon condition acknowledged.**
+
+---
+
+# Bones Verdict — ORDER 007 Cell Steward Dashboard
+**Date:** 2026-09-10
+**Build Reviewed:** CREW-ORDER-007 — StewardDashboard.tsx, IsolateList.tsx, HubList.tsx, LogOfflineTrade.tsx, `api/steward/[...path].ts`
+**Reviewer:** Spock, standing in for Bones per the 2026-09-10 interim note — **code-level review against the Bones Brief, not a live/visual walkthrough.** No screenshot or browser-automation tool is available this session, so this verdict is grounded in source comparison against the approved visual spec, not an actual rendered screen. Treat as a strong first pass, not a substitute for a real Bones look at the live app once one is possible.
+
+## Verdict: NEEDS REVISION
+
+This is a genuine finding, not a formality — several explicit anti-patterns from the Bones Brief are violated in the current code, and two of the order's own milestones were marked "pass" in earlier standups without the underlying feature actually existing.
+
+### Bones Brief compliance checklist
+
+| Requirement | Status | Notes |
+|---|---|---|
+| NetworkSummary: trend + plain-language phase message + stat, driven by real data | ❌ **FAIL** | `StewardDashboard.tsx` hardcodes `trend="stable"` and a canned message ("Your cell is just getting started...") directly in JSX. There is no `GET /steward/network-summary/:cell_id` route in `api/steward/[...path].ts` at all — only `dashboard`, `isolates`, `hubs` are implemented. This is CREW-ORDER-007 §6.1.4 and Milestone #4, both of which prior standups marked ✅ on 2026-07-09. That was premature — the phase-detection logic described in the spec was never actually wired to this component. |
+| Needs Radar: communicate urgency without numbers, larger/ringed circles only | ❌ **FAIL** | `NeedsRadar` renders the raw count inside each circle (`{hasNeed ? count : ''}`). The brief is explicit: "communicate urgency without numbers." Size scaling is implemented correctly, but the numeral defeats the stated intent. |
+| No red/alert colours for isolate flags — ochre only | ❌ **FAIL** | Both `MemberRow`'s "Out of touch" status dot/badge and the isolate count badge on the main dashboard use `#C85A3C` — a rust/terracotta red, the same colour used elsewhere in the app for error states (`error ? ... color: '#C85A3C'`). The brief names this exact anti-pattern: "No red/alert colours for isolate flags — ochre... per prototype." `#E6A854` (already in use for "Quiet" status) is the correct colour and is sitting right there in the same file, unused for this purpose. |
+| Isolate badge language — warmth, not alarm ("X out of touch" not "X isolates detected") | ✅ | "{count} out of touch" — correct copy, even though the colour undercuts it |
+| Non-Steward at `/steward` sees a warm redirect message, not an error/403 | ❌ **FAIL** | No role-gate UI exists in `App.tsx` or `StewardDashboard.tsx` — a non-Steward hitting `/steward` would trigger the API's 403 and the component would render its generic `error` state ("Could not load dashboard. {error}"), not the specified "This area is for your Cell Steward" message. Milestone #7, also marked ✅ previously — also premature. |
+| "Tap an area..." instruction uses `t()` i18n | ❌ **FAIL** | Hardcoded string: "Tap an area to see what's unmet. Bigger circles need you most." Not run through `t()`, despite `CREW-ORDER-007.md` §6.2 calling this out specifically. |
+| No "dashboard" language in the UI — heading is the cell name | ✅ | Heading is `data.cellName`, never "Dashboard" |
+| No raw numbers without plain-language context (recent activity line, reciprocity flags) | ✅ | Recent activity and reciprocity copy are in plain language |
+| No node-link graph visualisation | ✅ | NetworkSummary and NeedsRadar are both non-graph — correct even though the summary content itself is wrong (see above) |
+| No "manage"/"administer" framing | ✅ | Nothing in the copy uses this framing |
+| IsolateList / HubList / LogOfflineTrade exist and are wired in | ✅ | All three present and imported into `StewardDashboard.tsx`, per the ORDER 007b delivery |
+
+### Anti-patterns confirmed present (should be absent)
+- ❌ Red/alert colour used for isolate status (both `MemberRow` and the header badge)
+- ❌ Raw numeric counts inside NeedsRadar circles
+
+### What's actually missing versus what was reported complete
+The 2026-07-09 standup's Milestones table marked #4 (network summary) and #7 (role-gate message) as ✅. Neither is true of the current code. This isn't a regression — closest read of the history is that the network-summary endpoint and role-gate UI were never built in the first place, and the milestone table was filled in against the spec's intent rather than a working feature. Worth noting for the crew generally: milestone tables should reflect what was actually verified running, not what was planned to exist.
+
+### Emotional target assessment
+The brief's target is "I know what's happening in my cell right now... I'm not alone in this." The member list, isolate badge copy, and reciprocity flags mostly land that tone. But the NetworkSummary card — the first thing a Steward sees — currently tells every Steward the same canned "just getting started" message regardless of their cell's real state, which undercuts the "I know what's happening right now" promise directly. And red-for-isolates reads as alarm, not the "warmth, not alarm" the brief calls for.
+
+### Required before this can move to PASS or CONDITIONAL PASS
+1. Change isolate-status colours (`MemberRow` status dot/badge, dashboard isolate-count badge) from `#C85A3C` to the ochre already used for "Quiet" (`#E6A854`) or a dedicated ochre token — small, contained fix.
+2. Remove the raw count number from inside NeedsRadar circles — size alone should carry the signal, per brief.
+3. Build `GET /steward/network-summary/:cell_id` per CREW-ORDER-007 §6.1.4 and wire `StewardDashboard.tsx` to it instead of the hardcoded trend/message — this is the larger piece of remaining work.
+4. Add a warm role-gate message component for non-Steward visitors to `/steward`, distinct from the generic API-error state.
+5. Route the NeedsRadar instruction copy through `t()`.
+
+Items 1, 2, 4, and 5 are small and contained. Item 3 is real engineering work — closer to a mini follow-up order than a fix.
+
+**Bones sign-off: NEEDS REVISION — genuine gaps against the brief, not a formality. Re-review once the five items above land.**
+
+---
+
+# Bones Verdict — ORDER 008 Community Marketplace
+**Date:** 2026-09-10
+**Build Reviewed:** CREW-ORDER-008 — Marketplace.tsx, ProgrammeCard.tsx
+**Reviewer:** Spock, standing in for Bones per the 2026-09-10 interim note — **code-level review, not a live/visual walkthrough**, for the same reason as the ORDER 007 verdict above.
+
+## Verdict: CONDITIONAL PASS
+
+### Bones Brief compliance checklist
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Entry point is a question, not a label, with the specified subtitle | ✅ | `t('support.question', ...)` and `t('support.subtitle', ...)` match the brief text exactly |
+| Pillar grid identical to Trade Exchange | ✅ | Literally reuses `PillarFilterRow` from ORDER 006 — same component, same visual, zero drift possible |
+| ProgrammeCard: provider secondary, offering name leads, pillar tag, endorsement count, request button | ✅ | Provider name rendered smaller/muted below the card body; offering `name` is the `<h3>` |
+| "Used by X communities" shown only when count > 0 | ✅ | `{endorsementCount > 0 && (...)}` |
+| "Recommended by X of Y communities" phrasing, not a star rating | ✅ | Exact phrasing present, no rating/star UI anywhere in the card |
+| No "Marketplace" in community-facing UI | ✅ | All UI copy routed through `support.*` i18n keys — grepped the component tree, no literal "Marketplace" string in user-facing text |
+| No "Grounder" in community-facing UI | ✅ | Confirmation copy says "The provider will review your request" — "provider," not "Grounder" |
+| No pricing/cart/checkout language | ✅ | None present |
+| Back navigation + solid pillar tag badge after selecting a pillar | ✅ | Matches brief exactly, including the arrow-left copy |
+| Empty state is warm, not disappointing | ✅ | "Nothing here yet — check another kind of support." — exact match |
+| Request button uses Fynbos Aloe | ✅ | `backgroundColor: 'var(--aloe)'` |
+| Card has no 6px left border (pillar tag carries identification instead) | ✅ | Confirmed absent |
+
+### Anti-patterns confirmed absent
+- ❌ No "Marketplace" or "Grounder" anywhere in the reviewed components
+- ❌ No pricing, cart, or checkout framing
+- ❌ No star ratings or scoring mechanics
+
+### Conditions
+1. **Offline catalogue cache not implemented** (Milestone #10, §6.5 of the spec) — request queuing via Outbox works, but the Programme Offering catalogue itself isn't cached in IndexedDB, so offline *browsing* isn't yet possible, only offline *requesting* of an already-loaded list. Already flagged as a known deviation in the 2026-07-23 standup; not a Bones visual issue, but worth carrying forward as a real gap against the written spec.
+2. **Afrikaans translations** — same standing condition as every prior order; not blocking.
+
+### Emotional target assessment
+"My community can get support for what we need. It's clear what's available and how to ask." The entry question, pillar grid reuse, and warm empty/confirmation states land this well. The naming discipline (never "Marketplace," never "Grounder") is followed precisely — this was the order's trickiest constraint and it holds up under a direct code read.
+
+**Bones sign-off: CONDITIONAL PASS — merge when offline-cache gap is acknowledged as a tracked follow-up, not treated as done.**
