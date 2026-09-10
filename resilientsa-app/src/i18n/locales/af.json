@@ -91,5 +91,14 @@
     "edit_heading": "Your gifts",
     "edit_subtext": "You can update these any time.",
     "save_btn": "Save changes"
+  },
+  "admin": {
+    "nodesHeading": "Your nodes",
+    "createNodeHeading": "Create a node",
+    "cellsHeading": "Your cells",
+    "createCellHeading": "Create a cell",
+    "unassignedHeading": "Not yet in a cell",
+    "makeSteward": "Make Cell Steward",
+    "roleGateMessage": "This area is for Node and Regional coordination."
   }
 }
