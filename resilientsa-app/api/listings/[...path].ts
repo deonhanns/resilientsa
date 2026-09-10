@@ -17,7 +17,10 @@ import { eq, and, desc, sql } from 'drizzle-orm'
 type SessionCtx = { userId: string; userRole: string; nodeId: string }
 
 function segments(req: VercelRequest): string[] {
-  const p = req.query.path
+  // See SCOTTY_PATTERNS.md Pattern 006: this deployment's routing passes
+  // the catch-all param through with its literal '...' prefix still
+  // attached (req.query['...path'] instead of req.query.path).
+  const p = req.query.path ?? (req.query as Record<string, unknown>)['...path']
   if (Array.isArray(p)) return p as string[]
   if (typeof p === 'string') return [p]
   return []

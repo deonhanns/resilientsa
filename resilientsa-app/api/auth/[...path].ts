@@ -17,7 +17,13 @@ import { eq } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 
 function segments(req: VercelRequest): string[] {
-  const p = req.query.path
+  // This deployment's routing passes the catch-all param through with its
+  // literal '...' prefix still attached (req.query['...path'] instead of
+  // req.query.path) — a Vercel routing quirk when functions are declared
+  // via an explicit `functions` glob in vercel.json rather than pure
+  // filesystem convention. Check both so this works regardless of which
+  // routing path Vercel takes. See SCOTTY_PATTERNS.md Pattern 006.
+  const p = req.query.path ?? (req.query as Record<string, unknown>)['...path']
   if (Array.isArray(p)) return p as string[]
   if (typeof p === 'string') return [p]
   return []
@@ -138,19 +144,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (p0 === 'request-code') return requestCode(req, res)
   if (p0 === 'verify-code') return verifyCodeRoute(req, res)
 
-  // TEMPORARY DIAGNOSTIC (Spock, 2026-09-10): a 404 at this line means the
-  // function IS being invoked correctly by Vercel, but segments(req) isn't
-  // resolving the catch-all path segment the way the route expects. This
-  // makes that visible instead of returning a bare, indistinguishable 404.
-  // Remove once routing is confirmed working — see SCOTTY_PATTERNS.md if
-  // this recurs.
-  return res.status(404).json({
-    error: 'Not found',
-    debug: {
-      url: req.url,
-      method: req.method,
-      queryPath: req.query.path,
-      allQuery: req.query,
-    },
-  })
+  return res.status(404).json({ error: 'Not found' })
 }
