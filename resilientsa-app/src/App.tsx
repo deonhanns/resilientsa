@@ -8,6 +8,7 @@ import StewardDashboard from './components/steward-dashboard/StewardDashboard'
 import Marketplace from './components/marketplace/Marketplace'
 import GrounderOfferings from './components/marketplace/GrounderOfferings'
 import GrounderRequests from './components/marketplace/GrounderRequests'
+import BottomNav from './components/navigation/BottomNav'
 
 const DEMO_PARAM = 'demo'
 
@@ -31,6 +32,22 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (authed === null) return null
   if (!authed) return <Navigate to={`/join${demo ? '?demo' : ''}`} replace />
   return <>{children}</>
+}
+
+// Wraps the three primary-nav screens (Trade Exchange, Get Support, Steward)
+// with the persistent BottomNav — the McCoy prototype's phone-chrome pattern
+// (content scrolls, nav stays fixed). Onboarding (/join, /profile) and the
+// unbuilt /admin placeholder deliberately stay outside this shell: there's
+// nowhere for a new, profile-less user to navigate to yet.
+function AppShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+        {children}
+      </div>
+      <BottomNav />
+    </div>
+  )
 }
 
 // Redirects to /trade after profile check
@@ -69,11 +86,11 @@ function DemoApp() {
         <Route path="/join" element={<JoinPage />} />
         <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><GiftsCapture /></ProtectedRoute>} />
-        <Route path="/trade"   element={<ProtectedRoute><TradeExchange /></ProtectedRoute>} />
-        <Route path="/support" element={<ProtectedRoute><Marketplace /></ProtectedRoute>} />
-        <Route path="/support/new" element={<ProtectedRoute><GrounderOfferings /></ProtectedRoute>} />
-        <Route path="/support/requests" element={<ProtectedRoute><GrounderRequests /></ProtectedRoute>} />
-        <Route path="/steward" element={<ProtectedRoute><StewardDashboard /></ProtectedRoute>} />
+        <Route path="/trade"   element={<ProtectedRoute><AppShell><TradeExchange /></AppShell></ProtectedRoute>} />
+        <Route path="/support" element={<ProtectedRoute><AppShell><Marketplace /></AppShell></ProtectedRoute>} />
+        <Route path="/support/new" element={<ProtectedRoute><AppShell><GrounderOfferings /></AppShell></ProtectedRoute>} />
+        <Route path="/support/requests" element={<ProtectedRoute><AppShell><GrounderRequests /></AppShell></ProtectedRoute>} />
+        <Route path="/steward" element={<ProtectedRoute><AppShell><StewardDashboard /></AppShell></ProtectedRoute>} />
         <Route path="/admin"   element={<div>Node Admin — Phase 2</div>} />
       </Routes>
     </>
