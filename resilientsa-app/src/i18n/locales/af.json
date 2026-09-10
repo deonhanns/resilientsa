@@ -60,7 +60,9 @@
     "network_summary": "More members are connecting directly with each other, not just through you.",
     "needs_title": "Where the need is",
     "members_title": "Your members",
-    "out_of_touch": "{{count}} out of touch"
+    "out_of_touch": "{{count}} out of touch",
+    "needsInstruction": "Tap an area to see what's unmet. Bigger circles need you most.",
+    "roleGateMessage": "This area is for your Cell Steward."
   },
   "auth": {
     "join_heading": "Join your community",
