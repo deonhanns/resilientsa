@@ -138,3 +138,42 @@ export interface RequestResponse {
   engagementId: string
   status: string
 }
+
+// --- Node & Cell Formation types (ORDER 009a) ---
+
+export interface AdminNode {
+  id: string
+  name: string
+  raCpfName: string | null
+  healthState: string
+  createdBy: string | null
+  createdAt: string
+}
+
+export interface AdminNodesResponse {
+  nodes: AdminNode[]
+}
+
+export interface AdminCell {
+  id: string
+  nodeId: string
+  name: string
+  stewardUserId: string | null
+  stewardCompanionUserId: string | null
+  createdAt: string
+}
+
+export interface AdminCellsResponse {
+  cells: AdminCell[]
+}
+
+export interface AdminMember {
+  id: string
+  displayName: string
+  role: string
+  cellId: string | null
+}
+
+export interface AdminMembersResponse {
+  members: AdminMember[]
+}
