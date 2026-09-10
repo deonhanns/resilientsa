@@ -784,3 +784,55 @@ All business logic preserved verbatim (same imports, same queries, same RLS cont
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*
+
+---
+
+## 2026-09-10 — Spock (standing in for O'Brien, per AGENTS.md interim note)
+
+**Context:** O'Brien/DeepSeek out of credits since 2026-08-31, indefinite. Captain and Spock continued directly — live debugging done via Captain relaying Vercel dashboard screenshots, DevTools Network tab, and runtime logs, since Spock's sandbox cannot reach Vercel/Neon directly.
+
+**What was found and fixed, in the order discovered (all live-verified via Captain's browser, not just code review):**
+
+1. **Credential rotation completed.** Neon `neondb_owner` password reset (old hardcoded string from `test-listings-api.ts` treated as compromised). New pooled connection string obtained and confirmed correct format. `ENCRYPTION_KEY` generated fresh (pre-pilot, per Critical Rule #9 — safe, no real PII existed yet). All three (`DATABASE_URL`, `POSTGRES_URL`, `ENCRYPTION_KEY`) added to Vercel Production + Preview.
+2. **Vercel Deployment Protection was blocking all public access** ("Require Log In" / Standard Protection). Captain disabled it. This was separate from and in addition to the credential issue — both were required before anything could be tested publicly.
+3. **SCOTTY_PATTERNS.md Pattern 002 (ERR_REQUIRE_ESM on `src/db/index`)** — `api/package.json`'s CommonJS scope doesn't cover the sibling `src/` tree. Fixed with `resilientsa-app/src/package.json` (`"type": "commonjs"`). Documented as Pattern 004 (numbering corrected from an earlier draft).
+4. **Pattern 005 — AT SMS client crashed at import, not at call site.** `AfricasTalking({...})` was constructed at module top level in both `api/_lib/at.ts` and `server/lib/at.ts`; the SDK validates synchronously and throws on missing `AT_API_KEY`/`AT_USERNAME`, killing the whole function process before the caller's `try/catch` (which correctly falls back to `OTP_DEBUG_LOG`, Pattern 003) ever ran. Fixed: lazy `getClient()` construction in both files.
+5. **Pattern 006 — the big one.** Every catch-all function (`auth`, `marketplace`, `matches`, `listings`, `steward`) returned 404 on every request, despite: build succeeding, function correctly listed in Vercel's Resources tab at the exact right path, and confirmed correct domain (not a stale deployment URL). Diagnosed live by temporarily returning `req.query`/`req.url` in the 404 body — revealed the catch-all param arrives as literal key `"...path"`, not `"path"`. Root cause likely the explicit `functions` glob in root `vercel.json` (Pattern 001) bypassing Vercel's normal bracket-syntax query-param naming. Fixed: all 5 `segments()` helpers now check `req.query.path ?? req.query['...path']`. **This was the fix that made login actually complete** — Captain received a real OTP via `OTP_DEBUG_LOG`, entered it, reached the Gifts Profile screen, and completed it.
+6. **Pattern 007 — `/api/me` double-prefix + missing endpoint.** `TradeExchange.tsx` called `api.get('/api/me')`, but `lib/api.ts`'s client already prepends `/api` (`BASE_URL = '/api'`), so the real request hit `/api/api/me` — and `/api/me` didn't exist as a route anyway. Every user permanently saw "Your Cell Steward will add you to a cell soon" regardless of real cell status — indistinguishable from the correct empty state without reading the network tab. Fixed: built `api/me.ts`, extended `SessionContext` in `api/_lib/session.ts` to include `cellId`, fixed the client call to `api.get('/me')` and to actually read `me.cellId` instead of hardcoding `'default'`. **Live-verified:** Captain's real test user now returns a clean `200` with `cellId: null` — confirmed correct (not broken) since no cell assignment path exists yet (see below).
+
+All six patterns documented in full in `SCOTTY_PATTERNS.md` (Patterns 002–007; Pattern 001 pre-existing).
+
+**Verification method note:** all fixes in this session were confirmed via the Captain relaying Vercel Runtime Logs, DevTools Network tab responses, and screenshots — not via `curl`/CLI access, which Spock's sandbox doesn't have to the live URL. Slower than O'Brien's normal direct verification, but each fix above was confirmed working live before moving to the next, not just pushed and assumed.
+
+**Real architectural finding, not a bug — needs its own Crew Order:**
+Traced the dependency chain above cell assignment and found it doesn't exist as a product path at all:
+- **No node creation exists anywhere in the code.** Every new user is hardcoded into a single placeholder node at signup: `nodeId: '00000000-0000-0000-0000-000000000001'` (in `api/auth/[...path].ts`'s `verifyCodeRoute`). The platform is currently single-tenant at the node level, regardless of where a real user is.
+- **No path exists to assign the `node_admin` role.** It's a valid enum value in `users.role`, but nothing in the product ever sets it — every user defaults to `'member'`.
+- **No cell creation exists anywhere in the code** (confirmed via grep for `insert(cells)` — zero results). Cells only exist today via direct seed-script inserts.
+- **No Cell Steward assignment path exists** — `cells.stewardUserId` is a real column, nothing sets it through the product.
+- The `/admin` route is a literal unbuilt placeholder: `<Route path="/admin" element={<div>Node Admin — Phase 2</div>} />`.
+
+**Recommendation (Spock, pending Captain sign-off):** this should be its own Crew Order — proposed name **ORDER 009a — Node & Cell Formation** — sequenced *before* ORDER 009's SMS invite work, since invites are meaningless without a real node/cell to invite someone into. Not yet spec'd; needs a dedicated bridge session, not a quick fix. Flagging now so it's not lost.
+
+**Standing blockers, unchanged or updated:**
+- `AT_API_KEY`/`AT_USERNAME` still not in Vercel — OTP delivery is running entirely on the `OTP_DEBUG_LOG` fallback (Pattern 003). Fine for continued testing; must be resolved with real sender-ID registration before any real Delft member is invited (lead time: days to weeks through SA mobile networks — Captain should start this in parallel, not after everything else).
+- Hardcoded Neon credential in `test-listings-api.ts` — flagged High by Worf on 2026-08-17 — was addressed by rotation, but the **hardcoded string itself may still be present in the file/git history** and should be confirmed removed, not just rendered inert by rotation.
+- Bones review for ORDER 007 (Steward Dashboard) and ORDER 008 (Marketplace) — still pending. Login now works, so this is finally unblocked to do properly against the live app rather than mockups.
+- Test user `70930429-e479-4013-8698-5e9325ef95cb` (Captain's own test login) has no `cellId` — needs manual assignment to see a populated Trade Exchange feed. Small, quick fix once O'Brien resumes, or Spock can do it directly next session if given a target cell ID.
+- No bottom navigation exists in the app shell — `/trade`, `/support`, `/steward` are all live routes with no UI to move between them. Confirmed via `App.tsx`; the McCoy prototype's `BottomNav` component exists in the design system but isn't wired in. Not yet fixed this session — flagged, not resolved.
+
+**Protocol/pattern checked against:**
+- AGENTS.md Critical Rules #1 (build before push — not independently verified this session beyond TypeScript correctness by inspection; **Spock does not have a working `npm run build` environment and could not run this locally** — flagging as a real gap in this interim arrangement, not a shortcut taken lightly), #2 (no hardcoded secrets — new code clean), #3 (schema — no schema changes made), #6 (PII — `cellId`/`nodeId` are references, not new PII surface)
+- SCOTTY_PATTERNS.md Patterns 001–007 (six of seven discovered/documented this session)
+
+**Anything flagged to Worf or Bones:**
+- Worf: the hardcoded-credential item above needs explicit re-confirmation, not just assumed closed by rotation.
+- Bones: both ORDER 007 and 008 reviews are now finally do-able against a working live app — should happen next.
+
+**Next, in priority order:**
+1. Confirm hardcoded Neon string is actually removed from `test-listings-api.ts` (Worf item, not just inert)
+2. Assign Captain's test user a real `cellId` — quick
+3. Wire in `BottomNav` — small, contained
+4. Bones review — ORDER 007 + 008, against the real live app
+5. Design session for **ORDER 009a — Node & Cell Formation** (new, not yet spec'd)
+6. Start AT sender-ID registration in parallel (slow lead time, should not wait for the above)
