@@ -186,6 +186,18 @@ Items 1, 2, 4, and 5 are small and contained. Item 3 is real engineering work �
 
 **Bones sign-off: NEEDS REVISION — genuine gaps against the brief, not a formality. Re-review once the five items above land.**
 
+### Addendum — 2026-09-10, same session
+All five required items were fixed immediately following this verdict:
+1. ✅ Isolate colours changed from `#C85A3C` to ochre `#E6A854` in `MemberRow` and the dashboard isolate badge.
+2. ✅ Raw counts removed from inside `NeedsRadar` circles (still available via `title`/`aria-label`).
+3. ✅ `GET /steward/network-summary/:cellId` built per CREW-ORDER-007 §6.1.4 (four-phase model, trend detection, message templates); `StewardDashboard.tsx` now fetches and renders it instead of hardcoding.
+4. ✅ `RoleGateMessage` component added, shown on 403 instead of the generic error state.
+5. ✅ Needs-radar instruction and section headings now route through `t()`; new `steward.needsInstruction` and `steward.roleGateMessage` keys added to `en.json`/`af.json`.
+
+`npm run build` verified clean (zero TypeScript errors) after all five changes, against a fresh clone.
+
+**This addendum does not upgrade the verdict to PASS.** It is still a code-level review — no screenshot or live-app walkthrough has happened against these specific changes. The fixes should be treated as ready for a real Bones look at the live app, not as a closed item. Re-verify visually before considering ORDER 007 fully signed off.
+
 ---
 
 # Bones Verdict — ORDER 008 Community Marketplace
