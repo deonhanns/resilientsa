@@ -138,4 +138,34 @@ Changed `sms` from an eagerly-constructed client to a lazily-constructed one: th
 
 ---
 
+## Pattern 006 — Catch-All Query Param Arrives as `'...path'`, Not `'path'`
+**Escalation date:** 2026-09-10
+**Resolved by:** Spock (diagnosed live with the Captain via browser DevTools after O'Brien/DeepSeek ran out of credits mid-session)
+
+### Problem
+Every catch-all API route (`api/auth/[...path].ts`, `api/marketplace/[...path].ts`, etc.) returned 404 on every request, even though: the build succeeded, the function was correctly listed in Vercel's Resources tab at the exact expected path, and the domain being tested was confirmed correct (not a stale deployment URL).
+
+### Root Cause
+A temporary diagnostic added to the 404 fallback (returning `req.url`, `req.query`, etc. in the response body) revealed the actual query object: `{ "...path": "request-code" }` — the catch-all parameter arrived under the literal key `"...path"` (including the ellipsis), not the clean `"path"` key Next.js/Vercel's documented `[...path].ts` convention normally produces. Every `segments()` helper read `req.query.path`, which was `undefined`, so every request fell through to the handler's own 404 branch — indistinguishable from a real platform routing failure without inspecting the response body directly.
+
+Likely cause: this project declares its API functions via an explicit `functions` glob in the root `vercel.json` (`"resilientsa-app/api/**/*.ts"`, added in Pattern 001 to fix runtime version format) rather than relying purely on Vercel's filesystem-convention auto-detection. This may bypass the normal bracket-syntax parameter name parsing, leaving the raw `...path` token as the literal query key.
+
+### Resolution
+Every catch-all's `segments()` helper now checks both possible keys:
+```ts
+const p = req.query.path ?? (req.query as Record<string, unknown>)['...path']
+```
+Applied identically to all 5 catch-all functions: `api/auth/`, `api/marketplace/`, `api/matches/`, `api/listings/`, `api/steward/`.
+
+### Do NOT
+- Trust that a `[...path].ts` file will always populate `req.query.path` on this project — verify against a live request, not just documentation, whenever adding a new catch-all function
+- Remove the `?? (req.query as Record<string, unknown>)['...path']` fallback unless the root cause (the `functions` glob config vs. filesystem convention interaction) is fixed at the `vercel.json` level and confirmed via a live test
+- Assume a 404 from one of these functions means "not routed" — it may mean "routed correctly, but segments() didn't parse the path." Check the response body's `debug` fields (temporarily reintroduced if needed) before assuming a platform-level routing problem
+
+### Verification
+- Hit `POST /api/auth/request-code` live and confirm a real response (`{"message":"Code sent"}` or a 500 with `hasDbUrl`/`hasEncKey` diagnostics) — not a 404
+- If any *new* catch-all function is added later, test it live immediately; don't assume this class of bug can't recur
+
+---
+
 *Patterns are added after each escalation resolution. O'Brien reads before every session.*
