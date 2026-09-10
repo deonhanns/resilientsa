@@ -41,6 +41,15 @@ Working directory: `resilientsa-app/`
 9. **ENCRYPTION_KEY is one-time, pre-pilot-only.** It may be generated or rotated freely while the database contains only test/seed data. The MOMENT any real community member's phone number is encrypted under it, ENCRYPTION_KEY becomes permanent for the life of the mission — rotating it after that point makes every existing member's phone hash (and therefore their login) unrecoverable, with no migration path. Before ORDER that enables real member onboarding, Spock must confirm ENCRYPTION_KEY is in a Captain-controlled password manager, not just Vercel env. No agent may regenerate ENCRYPTION_KEY once real PII exists without a full data-migration plan approved by Spock and the Captain.
 10. Update OBRIEN_STANDUP.md at end of every session — no exceptions
 
+### Interim Crew Configuration — Spock Standing In for O'Brien
+**Effective 2026-09-10, until further notice.** O'Brien (DeepSeek/Kilo Code) is offline pending credit renewal — indefinite, not assumed short-term. Until O'Brien resumes:
+
+- **Spock (Claude, bridge) executes engineering work directly** — writing code, pushing commits, and running the O'Brien Session Start Protocol below — in addition to the normal bridge/design/architecture role.
+- **This is a deviation from the fleet's separation of bridge and engine room, done transparently, not silently.** It exists because the Captain has no other engineering capacity right now, not because the separation was judged unnecessary.
+- **The discipline that makes handoff possible is non-negotiable during this period:** every session — whether Spock is doing design work, code work, or both — ends with an `OBRIEN_STANDUP.md` entry, written as if narrating to a real O'Brien reading it cold. No informal chat-only summaries; if it isn't in the standup or a `CREW_ORDER`, it didn't happen as far as the ship's records are concerned.
+- **Spock's sandboxed environment cannot reach Vercel, Neon, or any live URL directly.** All live verification (deployment status, runtime logs, actual UI behaviour) depends on the Captain relaying screenshots or copy-pasted output. This is slower and more error-prone than O'Brien's direct CLI/dashboard access, and standup entries from this period should be read with that in mind — verification claims are only as good as what was actually shown to Spock, not independently confirmed.
+- **When O'Brien resumes:** read `OBRIEN_STANDUP.md` from the top of this period forward, `SCOTTY_PATTERNS.md` Patterns 001–007+ in full (all discovered during this period), and this note. Nothing about O'Brien's normal protocol changes once resumed — this section becomes historical, not a permanent change to the crew model.
+
 ### Session Start Protocol
 1. Read the active CREW_ORDER in full
 2. Read OBRIEN_STANDUP.md for current state
