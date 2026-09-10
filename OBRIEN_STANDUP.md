@@ -206,7 +206,7 @@ If blocked on the same issue for 3 consecutive sessions, escalate to Scotty per 
 - `server/lib/gifts-nudge.ts` — `fireComplementaryGiftsNudge`: checks cell membership → steward → existing profiles → writes `notification_log` row
 - `server/index.ts` — gifts router mounted at `/gifts-profile`
 - `src/lib/types.ts` — `GiftsProfile` TypeScript interface
-- `src/lib/api.ts` — `giftsProfileApi.get()` and `.put()` methods, `put` method added to base `api`
+- `src/lib/api.ts` — `giftsProfileApi.get()` and `.put()` methods, `put` method added to base `api` object
 - `src/components/gifts-profile/GiftsCapture.tsx` — three-question sequential capture flow with pre-filled edit, completion state, redirect to /trade
 - `src/App.tsx` — `/profile` route with protected GiftsCapture, post-auth redirect to `/profile` if no gifts profile exists, `/` checks for profile
 - i18n: 13 `gifts.*` keys in en.json + af.json
@@ -812,7 +812,7 @@ Traced the dependency chain above cell assignment and found it doesn't exist as 
 - **No Cell Steward assignment path exists** — `cells.stewardUserId` is a real column, nothing sets it through the product.
 - The `/admin` route is a literal unbuilt placeholder: `<Route path="/admin" element={<div>Node Admin — Phase 2</div>} />`.
 
-**Recommendation (Spock, pending Captain sign-off):** this should be its own Crew Order — proposed name **ORDER 009a — Node & Cell Formation** — sequenced *before* ORDER 009's SMS invite work, since invites are meaningless without a real node/cell to invite someone into. Not yet spec'd; needs a dedicated bridge session, not a quick fix. Flagging now so it's not lost.
+**Recommendation (Spock, pending Captain sign-off):** this should be its own Crew Order — proposed name **ORDER 009a — Node & Cell Formation**, sequenced *before* ORDER 009's SMS invite work, since invites are meaningless without a real node/cell to invite someone into. Not yet spec'd; needs a dedicated bridge session. Flagging now so it's not lost.
 
 **Standing blockers, unchanged or updated:**
 - `AT_API_KEY`/`AT_USERNAME` still not in Vercel — OTP delivery is running entirely on the `OTP_DEBUG_LOG` fallback (Pattern 003). Fine for continued testing; must be resolved with real sender-ID registration before any real Delft member is invited (lead time: days to weeks through SA mobile networks — Captain should start this in parallel, not after everything else).
@@ -836,3 +836,38 @@ Traced the dependency chain above cell assignment and found it doesn't exist as 
 4. Bones review — ORDER 007 + 008, against the real live app
 5. Design session for **ORDER 009a — Node & Cell Formation** (new, not yet spec'd)
 6. Start AT sender-ID registration in parallel (slow lead time, should not wait for the above)
+
+---
+
+## 2026-09-10 (pt. 2) — Spock (standing in for O'Brien) — Housekeeping: credential fix + status sync
+
+**What I worked on:**
+- Item 1 from the previous entry's priority list: confirmed and closed the hardcoded-Neon-credential item.
+- `MISSION_STATUS.md` ground-truth refresh (was stale since 2026-07-19 — didn't reflect ORDER 008 completion, the consolidation, or any of the 2026-09-10 login fixes).
+- Confirmed a change in operating constraints: this session's sandbox *can* reach `https://resilientsa.vercel.app` directly (200 OK) and resolve Neon's DNS — unlike 2026-09-10 pt.1, where all live verification depended on the Captain relaying screenshots. Not yet relied upon for anything beyond a plain GET; noting it so future sessions know to check rather than assume either way.
+
+**What's now complete and where it lives:**
+- [`resilientsa-app/scripts/test-listings-api.ts`](resilientsa-app/scripts/test-listings-api.ts) — re-read directly from GitHub first to confirm the hardcoded string (`neondb_owner:npg_nWYCKt34Zueg@...`) was **still present in source**, not already cleaned up. Rotation on 2026-09-10 pt.1 made the credential inert but did not remove it from the file. Replaced with `process.env.DATABASE_URL!` + a startup guard, matching the existing pattern already used in `scripts/seed-grounder.ts`. No behavioural change when run locally with `DATABASE_URL` set. Commit `3164423`.
+- [`MISSION_STATUS.md`](MISSION_STATUS.md) — rewritten to ground truth: ORDER 008 shown as built + schema-fixed + live-verified (Bones pending, not "not started"); ORDER 007 shown as built with all sub-components shipped (Bones pending); new "ORDER 009a not yet spec'd" section added; Vercel preview URL corrected to `resilientsa.vercel.app`; Worf flags section shows the credential item resolved this session; Open Items table re-sequenced to match the priority list from pt.1. Commit `bb7479e`.
+
+**What's blocked, and on whom:**
+- The old hardcoded credential string still exists in **git history** (prior commits). Not rewriting history this session — the password is already rotated and inert, so this is residual exposure of a dead credential, not a live one. Flagging explicitly rather than treating rotation + source removal as fully closing the Worf item; Captain/Worf call on whether history rewrite is ever warranted.
+- `resilientsa-app.vercel.app` (the old domain referenced throughout earlier standups) could not be checked this session — it's not in this sandbox's network allowlist (`host_not_allowed`), so the 403 seen earlier this session was my own sandbox restriction, not a signal from Vercel itself. Per Captain: to be confirmed manually as the pre-rename alias via Vercel Project Settings → Domains. Not investigated further per Captain's explicit time-box.
+- Items 2–6 from the pt.1 priority list (cellId assignment, BottomNav, Bones reviews, ORDER 009a spec session, AT sender-ID registration) remain open — not attempted this session, Captain chose to sequence credential fix + status sync first.
+
+**Protocol/pattern checked against:**
+- AGENTS.md Critical Rules: #2 (no hardcoded secrets — resolved, not introduced), #5 (no secrets pushed — confirmed clean diff, only an env-var reference added), #10 (standup updated same session)
+- SCOTTY_PATTERNS.md — no new pattern; this was a straightforward secret-removal matching an existing in-repo convention, not a novel engineering problem
+- Read `MISSION_STATUS.md`, `OBRIEN_STANDUP.md`, and `SCOTTY_PATTERNS.md` in full before making any change this session, per the SPOCK-RULING standing rule
+
+**Anything flagged to Worf or Bones:**
+- Worf: credential removed from live source; git-history residue and the rotation-vs-removal distinction above should be treated as the actual closure record, not a blanket "resolved."
+- Bones: no change this session — ORDER 007 + 008 reviews still pending, now explicitly first on the reprioritized open-items list in `MISSION_STATUS.md`.
+
+**Next:** (1) Assign Captain's test user a real `cellId`. (2) Wire in `BottomNav`. (3) Bones review — ORDER 007 + 008 against the live app. (4) Design session for ORDER 009a. (5) Start AT sender-ID registration in parallel.
+
+---
+
+*This document is owned by O'Brien.*
+*Read by Spock for mission status visibility.*
+*Referenced in `CREW_MANIFEST.md` reporting section.*
