@@ -138,5 +138,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (p0 === 'request-code') return requestCode(req, res)
   if (p0 === 'verify-code') return verifyCodeRoute(req, res)
 
-  return res.status(404).json({ error: 'Not found' })
+  // TEMPORARY DIAGNOSTIC (Spock, 2026-09-10): a 404 at this line means the
+  // function IS being invoked correctly by Vercel, but segments(req) isn't
+  // resolving the catch-all path segment the way the route expects. This
+  // makes that visible instead of returning a bare, indistinguishable 404.
+  // Remove once routing is confirmed working — see SCOTTY_PATTERNS.md if
+  // this recurs.
+  return res.status(404).json({
+    error: 'Not found',
+    debug: {
+      url: req.url,
+      method: req.method,
+      queryPath: req.query.path,
+      allQuery: req.query,
+    },
+  })
 }
