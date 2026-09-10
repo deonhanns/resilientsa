@@ -1,5 +1,4 @@
 import { pgTable, uuid, text, real, timestamp } from 'drizzle-orm/pg-core'
-import { users } from './users'
 
 export const nodes = pgTable('nodes', {
   id:               uuid('id').primaryKey().defaultRandom(),
@@ -13,6 +12,11 @@ export const nodes = pgTable('nodes', {
   healthStateSetBy: uuid('health_state_set_by'),
   healthStateSetAt: timestamp('health_state_set_at', { withTimezone: true }),
   healthStateNotes: text('health_state_notes'),
-  createdBy:        uuid('created_by').references(() => users.id),
+  // FK to users.id enforced at the DB level (see migration 0004), not modeled
+  // via Drizzle's .references() here — same fix as the users.cellId /
+  // cells.stewardUserId precedent (ORDER 004): a Drizzle-level FK reference
+  // creates a nodes.ts <-> users.ts circular import that breaks tsc's type
+  // inference (TS7022/TS7024, confirmed by build). Plain uuid column instead.
+  createdBy:        uuid('created_by'),
   createdAt:        timestamp('created_at', { withTimezone: true }).defaultNow(),
 })
