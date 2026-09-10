@@ -4,9 +4,10 @@
 // consolidation to stay under the Vercel Hobby 12-function limit, Spock-approved).
 //
 // Internal routing (path segments from req.query.path):
-//   dashboard/:cellId      -> GET /api/steward/dashboard/:cellId
-//   isolates/:cellId       -> GET /api/steward/isolates/:cellId
-//   hubs/:cellId           -> GET /api/steward/hubs/:cellId
+//   dashboard/:cellId        -> GET /api/steward/dashboard/:cellId
+//   isolates/:cellId         -> GET /api/steward/isolates/:cellId
+//   hubs/:cellId              -> GET /api/steward/hubs/:cellId
+//   network-summary/:cellId   -> GET /api/steward/network-summary/:cellId
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSession, unauthorized, forbidden } from '../_lib/session'
 import { withRLSContext } from '../_lib/db-context'
@@ -226,6 +227,143 @@ async function hubs(req: VercelRequest, res: VercelResponse, cellId: string, ses
   }
 }
 
+// Sum of connection events touching any member in `memberIds`, within
+// [since, until). Deliberately follows the same per-member N+1 loop
+// pattern already established in dashboard()/isolates()/hubs() above,
+// rather than introducing a new query shape for this one route.
+async function countConnectionsInWindow(
+  nodeId: string,
+  memberIds: string[],
+  since: Date,
+  until?: Date,
+): Promise<number> {
+  let total = 0
+  for (const id of memberIds) {
+    const conditions = [
+      eq(connectionEvents.nodeId, nodeId),
+      gte(connectionEvents.createdAt, since),
+      sql`(${connectionEvents.userAId} = ${id} OR ${connectionEvents.userBId} = ${id})`,
+    ]
+    if (until) conditions.push(sql`${connectionEvents.createdAt} < ${until}`)
+    const [c] = await db.select({ count: count() }).from(connectionEvents).where(and(...conditions))
+    total += c?.count ?? 0
+  }
+  return total
+}
+
+type Phase = 'scattered' | 'hub-and-spoke' | 'multi-hub' | 'core-periphery'
+type Trend = 'growing' | 'stable' | 'declining'
+
+// Four-phase topology model per CREW-ORDER-007 §6.1.4 (June Holley / Krebs & Holley).
+function determinePhase(memberConnCounts: number[]): Phase {
+  const sorted = [...memberConnCounts].sort((a, b) => a - b)
+  const n = sorted.length
+  const median = n > 0
+    ? (n % 2 === 0 ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2 : sorted[Math.floor(n / 2)])
+    : 0
+  const over5 = sorted.filter((c) => c > 5).length
+  const over3 = sorted.filter((c) => c > 3).length
+
+  // core-periphery: top quartile all > 5, bottom quartile all < 2
+  if (n >= 4) {
+    const q = Math.floor(n / 4)
+    const topQuartile = sorted.slice(n - q)
+    const bottomQuartile = sorted.slice(0, q)
+    if (topQuartile.length > 0 && topQuartile.every((c) => c > 5)
+      && bottomQuartile.length > 0 && bottomQuartile.every((c) => c < 2)) {
+      return 'core-periphery'
+    }
+  }
+
+  if (over3 >= 4 && median > 2) return 'multi-hub'
+  if (over5 >= 1 && over5 <= 3) return 'hub-and-spoke'
+  return 'scattered'
+}
+
+function pickMessage(phase: Phase, trend: Trend, weekConnections: number): string {
+  if (trend === 'growing') {
+    return `Your cell's connections are growing — ${weekConnections} new connection${weekConnections === 1 ? '' : 's'} this week.`
+  }
+  if (phase === 'scattered') {
+    return "Your cell is just getting started — most members haven't connected yet."
+  }
+  if (phase === 'hub-and-spoke') {
+    return "A few members are connecting everyone — try introducing people who haven't met."
+  }
+  // multi-hub or core-periphery, not growing
+  return 'Your network is dense and distributed — the connections are making themselves.'
+}
+
+// GET /api/steward/network-summary/:cellId
+async function networkSummary(req: VercelRequest, res: VercelResponse, cellId: string, session: SessionCtx) {
+  if (cellId === 'c0000000-0000-0000-0000-000000000000') {
+    return res.json({
+      phase: 'scattered', trend: 'stable',
+      message: "Your cell is just getting started — most members haven't connected yet.",
+      stat: '0 connections this month', lastUpdated: new Date().toISOString(),
+    })
+  }
+
+  try {
+    const now = new Date()
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+    const result = await withRLSContext(session.nodeId, session.userRole, async () => {
+      const [cell] = await db.select({ id: cells.id }).from(cells)
+        .where(and(eq(cells.id, cellId), eq(cells.nodeId, session.nodeId)))
+      if (!cell) return { error: 'Cell not found', status: 404 as const }
+
+      const cellMembers = await db.select({ id: users.id }).from(users)
+        .where(and(eq(users.cellId!, cellId), eq(users.nodeId, session.nodeId)))
+      const memberIds = cellMembers.map((m) => m.id)
+
+      if (memberIds.length === 0) {
+        return {
+          phase: 'scattered' as Phase, trend: 'stable' as Trend,
+          message: "Your cell is just getting started — most members haven't connected yet.",
+          stat: '0 connections this month', lastUpdated: now.toISOString(),
+        }
+      }
+
+      // Per-member 30-day counts, for phase determination
+      const memberConnCounts: number[] = []
+      for (const id of memberIds) {
+        const c = await countConnectionsInWindow(session.nodeId, [id], thirtyDaysAgo)
+        memberConnCounts.push(c)
+      }
+      const phase = determinePhase(memberConnCounts)
+
+      const currentPeriod = await countConnectionsInWindow(session.nodeId, memberIds, thirtyDaysAgo)
+      const previousPeriod = await countConnectionsInWindow(session.nodeId, memberIds, sixtyDaysAgo, thirtyDaysAgo)
+      const weekConnections = await countConnectionsInWindow(session.nodeId, memberIds, sevenDaysAgo)
+
+      let trend: Trend = 'stable'
+      if (previousPeriod === 0) {
+        trend = currentPeriod > 0 ? 'growing' : 'stable'
+      } else {
+        const pctChange = (currentPeriod - previousPeriod) / previousPeriod
+        if (pctChange > 0.2) trend = 'growing'
+        else if (pctChange < -0.2) trend = 'declining'
+      }
+
+      return {
+        phase, trend,
+        message: pickMessage(phase, trend, weekConnections),
+        stat: `${currentPeriod} connection${currentPeriod === 1 ? '' : 's'} this month`,
+        lastUpdated: now.toISOString(),
+      }
+    })
+
+    if (result && 'error' in result) return res.status(result.status ?? 500).json({ error: result.error })
+    return res.json(result)
+  } catch (err) {
+    console.error('Network summary error:', err)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -241,6 +379,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (p0 === 'dashboard' && p1) return dashboard(req, res, p1, ctx)
   if (p0 === 'isolates' && p1) return isolates(req, res, p1, ctx)
   if (p0 === 'hubs' && p1) return hubs(req, res, p1, ctx)
+  if (p0 === 'network-summary' && p1) return networkSummary(req, res, p1, ctx)
 
   return res.status(404).json({ error: 'Not found' })
 }
