@@ -2,12 +2,18 @@
 // Cell Steward Dashboard — main screen (ORDER 007)
 
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { stewardApi } from '../../lib/api'
-import type { StewardDashboard as DashboardData } from '../../lib/types'
+import type { StewardDashboard as DashboardData, NetworkSummary as NetworkSummaryData } from '../../lib/types'
 import { PILLAR_COLOURS, PILLAR_TINTS, PILLAR_LABELS, ALL_PILLARS, type Pillar } from '../../lib/pillars'
 import IsolateList from './IsolateList'
 import HubList from './HubList'
 import LogOfflineTrade from './LogOfflineTrade'
+
+// Ochre — the Bones Brief's mandated colour for "attention without alarm"
+// (isolate/out-of-touch flags). Never the red/rust used for real errors.
+const OCHRE = '#E6A854'
+const OCHRE_TINT = '#F9EFDA'
 
 // ─── Sub-component: NetworkSummary ───
 function NetworkSummaryCard({ trend, message, stat }: { trend: string; message: string; stat: string }) {
@@ -35,6 +41,10 @@ function NetworkSummaryCard({ trend, message, stat }: { trend: string; message: 
 }
 
 // ─── Sub-component: NeedsRadar ───
+// Per Bones Brief: "communicate urgency without numbers — larger, ringed
+// circles demand attention." No raw counts render on the circles; size
+// alone carries the signal. Title attribute still exposes the count for
+// accessibility/tooltip purposes without putting it in the visual itself.
 function NeedsRadar({ needs, onPillar }: { needs: Record<string, number>; onPillar: (pillar: Pillar) => void }) {
   const maxNeed = Math.max(...Object.values(needs), 1)
   return (
@@ -48,6 +58,7 @@ function NeedsRadar({ needs, onPillar }: { needs: Record<string, number>; onPill
             key={pillar}
             onClick={() => onPillar(pillar)}
             title={`${PILLAR_LABELS[pillar]}: ${count}`}
+            aria-label={`${PILLAR_LABELS[pillar]}: ${count}`}
             style={{
               width: size,
               height: size,
@@ -59,16 +70,8 @@ function NeedsRadar({ needs, onPillar }: { needs: Record<string, number>; onPill
               justifyContent: 'center',
               cursor: 'pointer',
               transition: 'transform 0.15s',
-              fontSize: '10px',
-              fontWeight: 600,
-              color: hasNeed ? '#fff' : 'var(--text-muted, #999)',
-              lineHeight: 1.2,
-              textAlign: 'center',
-              padding: 4,
             }}
-          >
-            {hasNeed ? count : ''}
-          </button>
+          />
         )
       })}
     </div>
@@ -77,8 +80,8 @@ function NeedsRadar({ needs, onPillar }: { needs: Record<string, number>; onPill
 
 // ─── Sub-component: MemberRow ───
 function MemberRow({ member }: { member: DashboardData['members'][number] }) {
-  const statusColor = member.recentConnections === 0 ? '#C85A3C' :
-    member.recentConnections < 3 ? '#E6A854' : '#4A7256'
+  const statusColor = member.recentConnections === 0 ? OCHRE :
+    member.recentConnections < 3 ? OCHRE : '#4A7256'
   const statusLabel = member.recentConnections === 0 ? 'Out of touch' :
     member.recentConnections < 3 ? 'Quiet' : 'Active'
 
@@ -109,10 +112,24 @@ function MemberRow({ member }: { member: DashboardData['members'][number] }) {
       <span style={{
         fontSize: '11px', color: statusColor, fontWeight: 500,
         padding: '2px 8px', borderRadius: '10px',
-        background: statusColor === '#C85A3C' ? '#F5E3DC' : statusColor === '#E6A854' ? '#F9EFDA' : '#E4EBE5',
+        background: statusColor === OCHRE ? OCHRE_TINT : '#E4EBE5',
       }}>
         {statusLabel}
       </span>
+    </div>
+  )
+}
+
+// ─── Sub-component: role-gate message ───
+// Per Bones Brief: a non-Steward at /steward should see a warm message,
+// not a technical error. Distinct from the generic network-error state.
+function RoleGateMessage({ message }: { message: string }) {
+  return (
+    <div style={{ padding: '48px 24px', textAlign: 'center' }}>
+      <div style={{ fontSize: 32, marginBottom: 12 }}>🤝</div>
+      <p style={{ font: 'var(--role-body, 15px/1.5 sans-serif)', color: 'var(--text-secondary, #555)', margin: 0 }}>
+        {message}
+      </p>
     </div>
   )
 }
@@ -136,26 +153,51 @@ const DEMO_DATA: DashboardData = {
   ],
 }
 
+const DEMO_NETWORK_SUMMARY: NetworkSummaryData = {
+  phase: 'scattered',
+  trend: 'stable',
+  message: "Your cell is just getting started — most members haven't connected yet.",
+  stat: '8 connections this month',
+  lastUpdated: new Date().toISOString(),
+}
+
 export default function StewardDashboard() {
+  const { t } = useTranslation()
   const [data, setData] = useState<DashboardData | null>(null)
+  const [summary, setSummary] = useState<NetworkSummaryData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [roleGated, setRoleGated] = useState(false)
   const demo = new URLSearchParams(window.location.search).has('demo')
   const testCellId = 'c0000000-0000-0000-0000-000000000000'
 
   useEffect(() => {
     if (demo) {
       setData(DEMO_DATA)
+      setSummary(DEMO_NETWORK_SUMMARY)
       setLoading(false)
       return
     }
-    stewardApi.dashboard(testCellId)
-      .then(setData)
-      .catch((err) => setError(err.message))
+    Promise.all([
+      stewardApi.dashboard(testCellId),
+      stewardApi.networkSummary(testCellId),
+    ])
+      .then(([dashboardData, summaryData]) => {
+        setData(dashboardData)
+        setSummary(summaryData)
+      })
+      .catch((err) => {
+        if (err.message?.includes('403')) {
+          setRoleGated(true)
+        } else {
+          setError(err.message)
+        }
+      })
       .finally(() => setLoading(false))
   }, [demo])
 
   if (loading) return <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
+  if (roleGated) return <RoleGateMessage message={t('steward.roleGateMessage', 'This area is for your Cell Steward.')} />
   if (error) return <div style={{ padding: 24, color: '#C85A3C' }}>Could not load dashboard. {error}</div>
   if (!data) return <div style={{ padding: 24, color: 'var(--text-muted)' }}>No dashboard data available.</div>
 
@@ -173,14 +215,16 @@ export default function StewardDashboard() {
         </p>
       </div>
 
-      {/* Network Summary */}
-      <NetworkSummaryCard trend="stable" message="Your cell is just getting started — most members haven't connected yet." stat={`${data.recentActivity.newConnections} connections this month`} />
+      {/* Network Summary — real data from /steward/network-summary/:cellId, not hardcoded */}
+      {summary && (
+        <NetworkSummaryCard trend={summary.trend} message={summary.message} stat={summary.stat} />
+      )}
 
       {/* Needs Radar */}
       <section>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
           <h3 style={{ font: 'var(--role-heading, 16px/1.4 sans-serif)', color: 'var(--text-primary, #2C2A29)', margin: 0, fontWeight: 600 }}>
-            Where the need is
+            {t('steward.needs_title', 'Where the need is')}
           </h3>
         </div>
         <div style={{
@@ -191,10 +235,10 @@ export default function StewardDashboard() {
           padding: '18px 12px 12px',
         }}>
           <NeedsRadar needs={data.needsRadar} onPillar={(_p) => {
-            // MVP: pillar tap visual feedback only — counts shown on circles
+            // MVP: pillar tap visual feedback only — see title/aria-label for the count
           }} />
           <p style={{ font: 'var(--role-caption, 12px/1.4 sans-serif)', color: 'var(--text-muted, #6B6B6B)', textAlign: 'center', margin: '6px 0 0' }}>
-            Tap an area to see what's unmet. Bigger circles need you most.
+            {t('steward.needsInstruction', "Tap an area to see what's unmet. Bigger circles need you most.")}
           </p>
         </div>
       </section>
@@ -230,18 +274,18 @@ export default function StewardDashboard() {
       <section>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <h3 style={{ font: 'var(--role-heading, 16px/1.4 sans-serif)', color: 'var(--text-primary, #2C2A29)', margin: 0, fontWeight: 600 }}>
-            Your members
+            {t('steward.members_title', 'Your members')}
           </h3>
           {isolates.length > 0 && (
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 5,
               font: 'var(--role-caption, 12px/1.4 sans-serif)',
-              color: '#C85A3C',
-              background: '#F5E3DC',
+              color: OCHRE,
+              background: OCHRE_TINT,
               padding: '2px 8px',
               borderRadius: '12px',
             }}>
-              {isolates.length} out of touch
+              {t('steward.out_of_touch', '{{count}} out of touch', { count: isolates.length })}
             </span>
           )}
         </div>
