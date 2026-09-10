@@ -9,6 +9,7 @@ import Marketplace from './components/marketplace/Marketplace'
 import GrounderOfferings from './components/marketplace/GrounderOfferings'
 import GrounderRequests from './components/marketplace/GrounderRequests'
 import BottomNav from './components/navigation/BottomNav'
+import NodeAdmin from './components/admin/NodeAdmin'
 
 const DEMO_PARAM = 'demo'
 
@@ -34,11 +35,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-// Wraps the three primary-nav screens (Trade Exchange, Get Support, Steward)
-// with the persistent BottomNav — the McCoy prototype's phone-chrome pattern
-// (content scrolls, nav stays fixed). Onboarding (/join, /profile) and the
-// unbuilt /admin placeholder deliberately stay outside this shell: there's
-// nowhere for a new, profile-less user to navigate to yet.
+// Wraps the primary-nav screens (Trade Exchange, Get Support, Steward,
+// and now Node Admin — ORDER 009a) with the persistent BottomNav — the
+// McCoy prototype's phone-chrome pattern (content scrolls, nav stays
+// fixed). Onboarding (/join, /profile) stays outside this shell: there's
+// nowhere for a new, profile-less user to navigate to yet. /admin's own
+// RoleGateMessage handles non-admin visitors, matching /steward's pattern.
 function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
@@ -91,7 +93,7 @@ function DemoApp() {
         <Route path="/support/new" element={<ProtectedRoute><AppShell><GrounderOfferings /></AppShell></ProtectedRoute>} />
         <Route path="/support/requests" element={<ProtectedRoute><AppShell><GrounderRequests /></AppShell></ProtectedRoute>} />
         <Route path="/steward" element={<ProtectedRoute><AppShell><StewardDashboard /></AppShell></ProtectedRoute>} />
-        <Route path="/admin"   element={<div>Node Admin — Phase 2</div>} />
+        <Route path="/admin"   element={<ProtectedRoute><AppShell><NodeAdmin /></AppShell></ProtectedRoute>} />
       </Routes>
     </>
   )
