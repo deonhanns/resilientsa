@@ -901,6 +901,46 @@ Traced the dependency chain above cell assignment and found it doesn't exist as 
 
 ---
 
+## 2026-09-10 (pt. 4) — Spock (standing in for O'Brien) — Bones review (007 + 008) + all 5 ORDER 007 fixes
+
+**What I worked on:** Next item in the priority queue after pt.3: Bones review for ORDER 007 (Steward Dashboard) and ORDER 008 (Marketplace). Found real gaps in 007, Captain chose to fix all of them immediately rather than defer.
+
+**What's now complete and where it lives:**
+
+- **Bones reviews written** in [`BONES_VERDICT.md`](BONES_VERDICT.md) — necessarily code-level, not a live/visual walkthrough (no screenshot or browser-automation tool available this session). Flagged as such in both verdicts, so a real Bones pass against the live app is still owed.
+  - **ORDER 007: NEEDS REVISION.** Five real findings, not formalities: isolate status used red (`#C85A3C`, shared with actual error states) instead of the brief's mandated ochre; `NeedsRadar` rendered raw counts inside circles when the brief says size alone should carry urgency; the `network-summary` endpoint specified in CREW-ORDER-007 §6.1.4 was **never built** — `StewardDashboard.tsx` hardcoded a canned "just getting started" trend/message for every cell, always; no warm role-gate message existed for non-Stewards hitting `/steward`; the needs-radar instruction text wasn't wired to i18n. Two of these (network summary, role-gate) were marked ✅ complete in the original 2026-07-09 standup's milestone table without the feature existing — worth a general note to the crew that milestone tables should reflect what was verified running, not what was planned.
+  - **ORDER 008: CONDITIONAL PASS.** Held up well under direct code read — naming discipline (never "Marketplace," never "Grounder" in community-facing copy) was followed precisely, endorsement phrasing matches the brief exactly, pillar grid is a literal reuse of `PillarFilterRow` so zero drift is possible. Only carried-forward gap is the known offline-catalogue-cache item from the original ORDER 008 standup.
+
+- **All five ORDER 007 findings fixed**, per Captain's "fix all 5 now" direction:
+  1. Isolate colours (`MemberRow` status dot/badge, dashboard isolate-count badge) changed from `#C85A3C` to ochre `#E6A854`.
+  2. Raw counts removed from inside `NeedsRadar` circles — still exposed via `title`/`aria-label` for accessibility, just not rendered visually.
+  3. [`GET /api/steward/network-summary/:cellId`](resilientsa-app/api/steward/[...path].ts) built from scratch per §6.1.4 — four-phase topology model (scattered / hub-and-spoke / multi-hub / core-periphery), 30-day-over-30-day trend detection, and the four message templates from the brief. `StewardDashboard.tsx` now calls `stewardApi.networkSummary()` (the client method already existed — only the backend route and the component wiring were missing) instead of hardcoding.
+  4. New `RoleGateMessage` component, shown when the dashboard fetch returns 403, instead of the generic network-error state.
+  5. Needs-radar instruction and section headings now route through `t()`; added `steward.needsInstruction` and `steward.roleGateMessage` to both `en.json` and `af.json` (af as English fallback, matching the existing steward-section pattern).
+  - [`BONES_VERDICT.md`](BONES_VERDICT.md) updated with an addendum documenting all five fixes — explicitly **not** upgraded to PASS, since this is still code-level verification, not a live look.
+
+**Verification — all pass:**
+- `npm run build` → zero TypeScript errors, run twice (once after the credential/BottomNav work in pt.3, once again after all five Bones fixes), both against fresh clones.
+- Confirmed `stewardApi.networkSummary()` and the `NetworkSummary` TypeScript type already existed in `lib/api.ts`/`lib/types.ts` before this session — only the backend route and the dashboard's fetch call were missing. Worth noting: the frontend plumbing was already correctly anticipating this endpoint.
+
+**What's blocked, and on whom:**
+- **A real Bones review against the live, rendered app is still owed for both orders.** Everything in this session's verdicts is a source-level comparison against the Bones Brief — accurate as far as it goes, but not a substitute for actually looking at the screen.
+- `assign-cell.ts` still hasn't been run against Neon — same blocker as pt.3, still needs Captain's `DATABASE_URL` or a local run.
+- ORDER 009a spec session — still not started, now further down the queue than originally planned since this session went deeper into 007 than intended.
+
+**Protocol/pattern checked against:**
+- AGENTS.md Critical Rules: #1 (build before push — verified twice this session, not asserted), #2 (no hardcoded secrets — none introduced), #3 (no schema changes), #6 (no new PII surface — network-summary aggregates connection counts, same category of data as the existing dashboard/hubs/isolates endpoints), #10 (standup updated same session)
+- CREW-ORDER-007.md §6.1.4, §6.2, §6.4 — network-summary phase/trend logic and the two missing i18n keys built to spec, not improvised
+- Followed the existing per-member N+1 query pattern already established in `dashboard()`/`isolates()`/`hubs()` in the same catch-all file, rather than introducing a different query shape for the one new route
+
+**Anything flagged to Worf or Bones:**
+- Bones: both verdicts filed, ORDER 007 addendum documents the fixes. A live-app re-review is the natural next Bones touchpoint once screenshots or browser access are available in a session.
+- Worf: no new PII surface from any of this session's changes.
+
+**Next:** (1) Captain: provide `DATABASE_URL` for `assign-cell.ts`, or run it locally. (2) Real live-app Bones walkthrough for ORDER 007 + 008 once possible. (3) Design session for ORDER 009a.
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*
