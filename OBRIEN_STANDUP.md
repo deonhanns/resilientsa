@@ -868,6 +868,39 @@ Traced the dependency chain above cell assignment and found it doesn't exist as 
 
 ---
 
+## 2026-09-10 (pt. 3) — Spock (standing in for O'Brien) — BottomNav + full credential sweep + assign-cell fix
+
+**What I worked on:** Captain's priority order for this session: BottomNav → cellId assignment → Bones review → ORDER 009a spec. Got through BottomNav fully, most of cellId assignment (script ready, execution blocked — see below), and along the way found the pt.2 credential fix was incomplete.
+
+**What's now complete and where it lives:**
+
+- **BottomNav wired in.** New [`src/components/navigation/BottomNav.tsx`](resilientsa-app/src/components/navigation/BottomNav.tsx) — React Router `NavLink` version of the McCoy prototype's `BottomNav.jsx` (icon+label per destination, active in Fynbos Aloe), using the emoji-icon convention already established in `PillarFilterRow.tsx` rather than the design system's SVG `Icon` component (consistent with the existing ORDER 006 deviation, not a new one). [`App.tsx`](resilientsa-app/src/App.tsx) now wraps `/trade`, `/support` (+`/new`, `/requests`), `/steward` in a small `AppShell` that pins the nav while content scrolls; `/join` and `/profile` (onboarding) and the unbuilt `/admin` placeholder stay outside it on purpose. Commits: BottomNav.tsx `0f8ec79`, App.tsx `b7c8aeb`.
+
+- **Full credential sweep — pt.2's fix was incomplete, not wrong.** Re-checked via GitHub code search (not just re-reading the one file already fixed) and found the same hardcoded Neon string in **four more files** beyond `test-listings-api.ts` and `assign-cell.ts`: `verify-db.ts`, `add-rls-new-tables.ts`, `create-default-node.ts`, `apply-custom-migration.ts` — six total. All fixed to `process.env.DATABASE_URL` with a startup guard, matching the `seed-grounder.ts` convention. Commits: `3001c6a`, `daca361`, `6bbf763`, `dbe2e91`. Closed out in [`WORF_ALERTS/2026-09-10-second-hardcoded-credential-instance.md`](WORF_ALERTS/2026-09-10-second-hardcoded-credential-instance.md), rewritten to document all six. **Worth being direct about this:** pt.2's standup said the item was "resolved" after fixing one file. It wasn't — the sweep should have been full-repo from the start, not stop-after-the-first-fix. Doing it properly this time: fresh clone, `grep -rn` for the credential string across the whole tree, confirmed zero remaining instances in source.
+
+- **`scripts/assign-cell.ts` fixed — two separate problems, not one.** (1) Same hardcoded-credential pattern as above, fixed the same way. (2) **Correctness bug**, independent of the security issue: it assigned the cell to `ORDER BY created_at DESC LIMIT 1` — "whoever signed up most recently" — instead of a specific user id. That's fragile: if `seed-grounder.ts`'s fixed test user (or anyone else) gets created after Captain's real test login, this silently assigns the cell to the wrong person with no error. Rewrote it to take the target user id as an explicit required CLI argument (`npx tsx scripts/assign-cell.ts <user-id> [cell-id] [cell-name]`), with a hard error if the id doesn't match any row. Commit `d5b9d27`.
+
+- **`npm run build` actually run, not just asserted.** This session's sandbox has a working `node`/`npm` (v22.22.2 / 10.9.7) — a real capability change from pt.1, where Spock explicitly flagged not having a build environment. Cloned fresh, `npm install`, `npm run build` — zero TypeScript errors, 76 modules (was 75; +1 for the new `BottomNav.tsx`), same pre-existing unrelated `INEFFECTIVE_DYNAMIC_IMPORT` warning on `outbox.ts` as before. Verified twice: once right after the BottomNav commit, once again after all six credential fixes landed, against a second fresh clone.
+
+**What's blocked, and on whom:**
+
+- **`assign-cell.ts` has not been run against Neon.** No `DATABASE_URL` in this session by design (Worf: restricted from being stored in any file, and this sandbox correctly doesn't have it sitting around). To actually assign Captain's test user (`70930429-e479-4013-8698-5e9325ef95cb`) to a cell, either: (a) Captain provides the real `DATABASE_URL` for a one-off run this session, same pattern as 2026-08-17's Captain-authorized use, or (b) Captain/O'Brien runs `npx tsx scripts/assign-cell.ts 70930429-e479-4013-8698-5e9325ef95cb` locally with the real env var set. Either way the script itself is ready and hardened.
+- Bones review — ORDER 007 + 008 — not started this session. Next in the priority order once cellId is resolved.
+- ORDER 009a spec session — not started. Last in the priority order.
+- Credential git-history residue (all six, now) — still unaddressed, same open call as pt.2: rotated/inert, Captain/Worf decision on whether a history rewrite is ever warranted.
+
+**Protocol/pattern checked against:**
+- AGENTS.md Critical Rules: #1 (build before push — **actually run this time**, not inspected-only), #2 (no hardcoded secrets — six found and fixed, not assumed-clean after the first), #3 (no schema changes), #4 (no new dependencies), #5 (no secrets pushed — confirmed via grep on a fresh clone, not just diff review), #6 (no new PII surface — BottomNav and assign-cell changes touch no PII fields), #10 (standup updated same session)
+- Read `MISSION_STATUS.md`, `OBRIEN_STANDUP.md`, `SCOTTY_PATTERNS.md` in full at the start of this session (covered earlier in the same session — not re-read a third time, per the standing rule's intent being "current context," which this still is)
+
+**Anything flagged to Worf or Bones:**
+- Worf: `WORF_ALERTS/2026-09-10-second-hardcoded-credential-instance.md` rewritten to ALL CLEAR for source, with the full six-instance list and an explicit note that the original 2026-08-17 alert's scope was incomplete — this should inform how thoroughly future one-off script credentials get swept, not just how this one got closed.
+- Bones: no change this session — still pending for ORDER 007 + 008, next in the priority queue.
+
+**Next:** (1) Captain: provide `DATABASE_URL` for a one-off `assign-cell.ts` run, or run it locally. (2) Bones review — ORDER 007 + 008, against the live app (BottomNav now makes this actually navigable end-to-end). (3) Design session for ORDER 009a.
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*
