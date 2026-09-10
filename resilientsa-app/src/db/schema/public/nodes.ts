@@ -1,4 +1,5 @@
 import { pgTable, uuid, text, real, timestamp } from 'drizzle-orm/pg-core'
+import { users } from './users'
 
 export const nodes = pgTable('nodes', {
   id:               uuid('id').primaryKey().defaultRandom(),
@@ -12,5 +13,6 @@ export const nodes = pgTable('nodes', {
   healthStateSetBy: uuid('health_state_set_by'),
   healthStateSetAt: timestamp('health_state_set_at', { withTimezone: true }),
   healthStateNotes: text('health_state_notes'),
+  createdBy:        uuid('created_by').references(() => users.id),
   createdAt:        timestamp('created_at', { withTimezone: true }).defaultNow(),
 })
