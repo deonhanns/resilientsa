@@ -971,6 +971,46 @@ Traced the dependency chain above cell assignment and found it doesn't exist as 
 
 ---
 
+## 2026-09-10 (pt. 6) — Spock (standing in for O'Brien) — CREW-ORDER-009a built end-to-end
+
+**What I worked on:** The one item left from the original priority queue — designed, then (per Captain's "let's complete order 009a now") built, ORDER 009a: Node & Cell Formation.
+
+**Design decisions, confirmed via bridge session before building:**
+- Member-to-cell assignment: real admin-assign UI now; SMS invite-links deferred to ORDER 009 proper.
+- Node creation: real "Create Node" UI now, even with only one node live.
+- Cell Steward promotion: self-serve by node_admin via the UI.
+- Role hierarchy resolved by activating the schema's existing-but-unused tiers: `regional_steward` creates Nodes and designates each Node's first `node_admin`; `node_admin` (scoped per node) creates Cells and promotes/demotes `cell_steward`. Full reasoning in [`CREW_ORDERS/CREW-ORDER-009a.md`](CREW_ORDERS/CREW-ORDER-009a.md).
+
+**What's now complete and where it lives:**
+- Schema: `nodes.created_by` (nullable, additive). **Note:** first attempt used Drizzle's `.references()` for the FK, which created a `nodes.ts` <-> `users.ts` circular import and broke `tsc` (TS7022/TS7024) — caught by a local build test before it went further, fixed the same way the `users.cellId`/`cells.stewardUserId` precedent from ORDER 004 was fixed: FK enforced at the DB level (migration), not modeled in Drizzle.
+- [`api/admin/[...path].ts`](resilientsa-app/api/admin/[...path].ts) — 7 routes: `nodes` GET/POST, `cells` GET/POST, `members` GET, `members/:id/cell` PATCH, `members/:id/role` PATCH. Function count now 8 (well under the 12 Hobby limit). Cross-node targets explicitly rejected on both mutation routes; `setMemberRole` only accepts `cell_steward`/`member` — cannot grant `node_admin`/`regional_steward`/`grounder` through it; `createNode` rejects promoting a user who already holds an administrative role elsewhere.
+- [`NodeAdmin.tsx`](resilientsa-app/src/components/admin/NodeAdmin.tsx) — Regional Steward view (create node + list nodes) and Node Admin view (create cell, assign unassigned members, self-serve steward promotion/demotion), with a warm `RoleGateMessage` for everyone else. No McCoy prototype exists for this screen — built directly against Living Soil tokens and the visual family already established in `StewardDashboard.tsx`, flagged explicitly in the order as needing a real Bones pass rather than a fidelity check.
+- `/admin` in `App.tsx` — **was completely unguarded** (a static div, no `ProtectedRoute` at all) — now properly wrapped and role-gated inside `NodeAdmin.tsx`. Fixed regardless of severity, per the order's Worf Brief.
+- `adminApi` client methods, `AdminNode`/`AdminCell`/`AdminMember` types, `admin.*` i18n keys (af as English fallback, matching the established pattern for internal-facing screens).
+- **Migration applied to Neon, and the platform's first `regional_steward` granted** — to Captain's own test user (`70930429-e479-4013-8698-5e9325ef95cb`), via the same narrow token-gated temp-Vercel-endpoint pattern from pt.5 (this sandbox still can't reach Postgres directly on port 5432). Created, called once, confirmed via its response, deleted in the next commit, confirmed removed (that URL now falls through to the general auth-gated admin catch-all, returning 401 rather than a bare 404 — same practical confirmation, different status code, since the catch-all now owns that path prefix).
+
+**Verification — all pass:**
+- `npm run build` run four times across this build (after each of: backend route, frontend+App.tsx+i18n, and two final full-repo checks against fresh clones) — zero errors each time, 77 modules (was 76).
+- Bootstrap confirmed directly via the temp endpoint's DB response: `{"ok":true,"migrationApplied":true,"user":{"id":"70930429-...","display_name":"Community member","role":"regional_steward"}}`.
+
+**What's blocked, and on whom:**
+- **Live UI/flow verification hasn't happened yet.** Everything above is build-verified and the bootstrap is DB-confirmed, but nobody has actually logged in and clicked through the real `/admin` screen — that's Captain's next step with the test user.
+- A real Bones review is still owed for this screen specifically (no prototype existed to check against in the first place — see above).
+- ORDER 009 proper (SMS invite-links) can now be spec'd whenever — this order was the blocker.
+
+**Protocol/pattern checked against:**
+- CREW-ORDER-009a.md §6, §4 (Worf Brief) — role-escalation validation built exactly as specified, not improvised
+- AGENTS.md Critical Rules: #1 (build verified four times, not asserted), #2/#5 (no secrets stored — same pattern as pt.5, confirmed via the temp-endpoint's narrow, deleted-after-use design), #3 (schema change — additive only, and the circular-import bug was caught and fixed before it reached the live DB)
+- Reused the established consolidated-catch-all pattern (function-count conservation) and the per-member/per-target ownership-check pattern already used throughout `api/steward/[...path].ts` and `api/marketplace/[...path].ts`
+
+**Anything flagged to Worf or Bones:**
+- Worf: this is the highest-privilege-escalation surface in the platform to date (explicitly called out in the order itself) — the validation logic deserves a second pair of eyes beyond this session's self-review before real Delft onboarding happens through it. Also: a second temporary token-gated production endpoint existed briefly today (same pattern as pt.5) — if this keeps recurring, it should graduate into permanent tooling rather than staying a recurring one-off, per the standing note from pt.5.
+- Bones: no live review possible yet — flagged as owed, not skipped.
+
+**Next:** (1) Captain: log in as the test user, try the real `/admin` flow — create a node, see it appear, and eventually create a cell as a promoted node_admin. (2) Real Bones review of `NodeAdmin.tsx` once there's live access. (3) Spec ORDER 009 proper (SMS invites) — no longer blocked.
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*
