@@ -1,7 +1,11 @@
 import pkg from 'pg'
 const { Client } = pkg
 
-const DATABASE_URL = "postgresql://neondb_owner:npg_nWYCKt34Zueg@ep-weathered-rice-asce69wr-pooler.c-4.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+const DATABASE_URL = process.env.DATABASE_URL!
+if (!DATABASE_URL) {
+  console.error('DATABASE_URL env var required')
+  process.exit(1)
+}
 
 const client = new Client({ connectionString: DATABASE_URL })
 
