@@ -2,7 +2,11 @@ import pkg from 'pg'
 const { Client } = pkg
 
 const BASE = 'http://localhost:3001'
-const DB_URL = 'postgresql://neondb_owner:npg_nWYCKt34Zueg@ep-weathered-rice-asce69wr-pooler.c-4.eu-central-1.aws.neon.tech/neondb?sslmode=require'
+const DATABASE_URL = process.env.DATABASE_URL!
+if (!DATABASE_URL) {
+  console.error('DATABASE_URL env var required')
+  process.exit(1)
+}
 
 async function main() {
   await fetch(`${BASE}/auth/request-code`, {
@@ -11,7 +15,7 @@ async function main() {
     body: JSON.stringify({ phone_number: '+27731234567' }),
   })
 
-  const c = new Client({ connectionString: DB_URL })
+  const c = new Client({ connectionString: DATABASE_URL })
   await c.connect()
   const { rows } = await c.query('SELECT code FROM otp_codes ORDER BY created_at DESC LIMIT 1')
   const code = rows[0]?.code
