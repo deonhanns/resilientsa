@@ -1095,7 +1095,46 @@ Omitting devDependencies changes *nothing*. So none of this is vite/esbuild buil
 
 ---
 
-**Next:** (1) Second-eyes pass on `api/admin/[...path].ts` role-escalation logic — the highest-risk item on the list. (2) Real Bones review of `NodeAdmin.tsx` + `StewardDashboard.tsx` once live access exists. (3) Spec ORDER 009 (SMS invites). (4) Captain decision on the stale `CHANGELOG.md`, and on the dependency findings above.
+### 2026-09-11 (cont. 2) — Captain-directed work package: 009a second-eyes review, ORDER 009 draft, accepted-risk register, record reconciliation
+
+**What I worked on:** five items, in the Captain's priority order. Item 2 of six is parked — blocker stated below rather than papered over.
+
+**1. Second-eyes review — `api/admin/[...path].ts` (CREW-ORDER-009a).** Filed as a standalone record: [`WORF_ALERTS/2026-09-11-order009a-role-escalation-review.md`](WORF_ALERTS/2026-09-11-order009a-role-escalation-review.md:1). **All four checks the Captain asked for PASS:**
+- `setMemberRole`'s allowlist is a strict *positive* check (`!== 'cell_steward' && !== 'member'` → 400), so it cannot be widened by a future schema change and has no coercion hole. `node_admin`, `regional_steward` and `grounder` are all rejected.
+- Both mutation routes node-check their target before writing; read routes are node-scoped rather than checked.
+- No route trusts a `nodeId` from the request body. `cellId` *is* taken from the body in `assignCell`, but validated against the session node before use. `session.nodeId` is read live from the database per request ([`session.ts:20`](resilientsa-app/api/_lib/session.ts:20)) — stronger than a token claim, since it cannot go stale.
+- Cross-node cell lookups return 404, not 403 — no existence leak.
+
+**But the review found CRIT-001, which is larger than the file it was asked to review.** [`db-context.ts:12`](resilientsa-app/api/_lib/db-context.ts:12) applies `set_config` on the transaction handle `tx`, then calls `fn()` — and all ~20 call sites pass a closure that queries the module-level `db`. `set_config(..., true)` is transaction-local, so the context never reaches the queries. `db.transaction` appears exactly once in the entire codebase. Compounding it: **no migration sets `FORCE ROW LEVEL SECURITY`**, and the app connects as `neondb_owner` — the table owner, which bypasses RLS by default. Every RLS policy in the schema is inert, including the `coop_pii` founding-member restriction. The AGENTS.md POPIA checklist item *"coop_pii access restricted to node_admin role only via RLS policy"* would therefore be marked PASS on review while being **functionally false** — a false compliance record, which is worse than a known gap.
+- Defect (a) is **proven from source**. The owner-bypass is **inferred** — strongly, since otherwise no unbounded query in the app could work — but **not confirmed live**: this sandbox still cannot reach Postgres on 5432. The alert carries the verification query and requires live confirmation before this is treated as settled.
+- **Deliberately not fixed.** It is a data-layer change touching every route, and Rule #3 reserves that to Spock. Recommended fix: thread `tx` into the closures, then either `FORCE` RLS or move the app to a dedicated non-owner role (preferred), then assert it in `scripts/verify-db.ts` so it is testable rather than trusted.
+- Also filed: **MED-002** `createNode` is a non-atomic check-then-act — two concurrent requests can leave a node with no `node_admin`. **MED-003** `createNode` and `assignCell` leave stale `cells.steward_user_id`; `createNode` can silently clobber a `grounder` role, leaving a split-brain `grounders` row. **MED-004** no audit trail on role grants. **MED-005** the sole `regional_steward` can irreversibly demote themselves via `createNode`. **LOW-006** `createNode`/`listNodes` omit `withRLSContext`. **LOW-007** fixed in the same commit.
+
+**2. Live Bones review — PARKED, and I want to be straight about why.** This session has no browser or screenshot capability. I can start a dev server; I cannot look at it. Running a third source-level pass and labelling it a "live review" would be precisely the mislabelling the Captain flagged on the 2026-09-10 verdicts. Parked until screenshots can be relayed.
+
+**3. ORDER 009 (SMS invites) drafted** — [`CREW_ORDERS/CREW-ORDER-009.md`](CREW_ORDERS/CREW-ORDER-009.md:1). **Marked DRAFT / NOT IN FORCE**, because Crew Orders are Spock's artefact and Rule #3 reserves schema changes to Spock: this is a proposal for review and issue, not an order in force. Two things surfaced during recon that would otherwise have been discovered painfully later:
+- `notification_log.message_type` has no invite value, **and** its `user_id` is `NOT NULL` — so an invite SMS to a not-yet-registered person is unloggable there by definition. Recommendation: keep send-status on the new `invites` row rather than bundling a `notification_log` change into this order.
+- **Sending an unsolicited SMS invitation is direct-marketing-adjacent under POPIA.** Flagged as a gate requiring an Uhura + Worf ruling before any real invite is sent. Recording plainly: I found this while writing the spec, and it is a legal question, not an engineering one — **I have not answered it.**
+- Also specced: `phone_number` as `bytea`, token stored only as SHA-256, single-use and expiring, forwarded links rejected by phone-hash matching, and `role` read from the invite row so an invite can never confer a steward/admin role. A separate `INVITE_DEBUG_LOG` rather than reusing `OTP_DEBUG_LOG` (different secret, different lifecycle), with Pattern 003's "unset before real users" warning carried forward.
+
+**4. Accepted-risk register created** — [`SECURITY_NOTES.md`](SECURITY_NOTES.md:1). AR-001 (AT SDK → `axios`/`lodash`/`joi`: no exploit path identified; only remedy offered is a breaking downgrade), AR-002 (react-router RSC advisory: precondition absent, declarative `BrowserRouter` only), AR-003 (`@vercel/node` build-tooling subtree audited as production). Each carries an explicit revisit trigger. The `npm audit fix --force` warning is repeated there on purpose — that file is what someone reads before running it. **Recorded explicitly: CRIT-001 is NOT an accepted risk** — it is an open Critical finding.
+
+**5. Audit count reconciled.** Both `npm audit` and `npm audit --omit=dev` now return **19 (4 moderate, 15 high, 0 critical)**. The earlier 27 came from the install-time summary counting *physical instances on disk* including nested duplicates (`brace-expansion` ×3, `minimatch` ×3, `path-to-regexp` ×2, `qs` ×2), measured while the tree was still mid-install. **19 is the figure to quote** — anything quoting 27 as an advisory count overstates the position. My own duplicate-counting script under-reported scoped packages (`@vercel/*` showed 0 copies), so the physical total is ~25, not the 21 it printed; noted so the number is not taken as exact.
+
+**6. CHANGELOG brought current** — one consolidated entry covering ORDER 008 → today, pointing here for detail rather than duplicating it, per Captain direction.
+
+**Protocol/pattern checked against:**
+- `AGENTS.md` Critical Rules #1 (build re-verified before this push), **#3 (no schema change made** — the 009a review is read-only, and ORDER 009 is a draft *precisely because* the schema change it needs is Spock's to approve**)** , #10 (this entry)
+- `SCOTTY_PATTERNS.md` Patterns 001, 003, 005 and 006 — all four are load-bearing for the ORDER 009 draft
+- `CREW-ORDER-009a.md` §4 and §6.2 as the review standard
+- Read `session.ts`, `db-context.ts`, `db.ts` and the `users`/`nodes`/`cells` schemas *before* asserting anything about isolation
+
+**Anything flagged to Worf or Bones:**
+- **Worf / Captain — CRIT-001 (Critical).** Escalated directly per the threshold. Now with Spock to turn into a Crew Order. Nothing was changed on the strength of it.
+- **Bones — three orders now owe a live verdict**, not two: 007, 008 and 009a. All three are currently source-level only. `NodeAdmin.tsx` has no prototype to check against at all.
+- **Captain — two decisions needed before ORDER 009 can reach real people:** the POPIA ruling on unsolicited invites, and AT sender-ID registration (long lead time — worth starting now, in parallel).
+
+**Next:** (1) Spock / Captain: review and approve (or amend) CREW-ORDER-009. (2) Spock: Crew Order for CRIT-001. (3) Live Bones pass once screenshots can be relayed. (4) Captain: POPIA ruling and AT sender-ID registration in parallel.
 
 ---
 
