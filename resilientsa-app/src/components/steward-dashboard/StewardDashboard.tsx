@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { stewardApi } from '../../lib/api'
+import { api, stewardApi } from '../../lib/api'
 import type { StewardDashboard as DashboardData, NetworkSummary as NetworkSummaryData } from '../../lib/types'
 import { PILLAR_COLOURS, PILLAR_TINTS, PILLAR_LABELS, ALL_PILLARS, type Pillar } from '../../lib/pillars'
 import IsolateList from './IsolateList'
@@ -120,10 +120,10 @@ function MemberRow({ member }: { member: DashboardData['members'][number] }) {
   )
 }
 
-// ─── Sub-component: role-gate message ───
+// ─── Sub-component: role-gate / no-cell-yet message ───
 // Per Bones Brief: a non-Steward at /steward should see a warm message,
 // not a technical error. Distinct from the generic network-error state.
-function RoleGateMessage({ message }: { message: string }) {
+function InfoMessage({ message }: { message: string }) {
   return (
     <div style={{ padding: '48px 24px', textAlign: 'center' }}>
       <div style={{ fontSize: 32, marginBottom: 12 }}>🤝</div>
@@ -165,26 +165,41 @@ export default function StewardDashboard() {
   const { t } = useTranslation()
   const [data, setData] = useState<DashboardData | null>(null)
   const [summary, setSummary] = useState<NetworkSummaryData | null>(null)
+  const [cellId, setCellId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [roleGated, setRoleGated] = useState(false)
+  const [noCellYet, setNoCellYet] = useState(false)
   const demo = new URLSearchParams(window.location.search).has('demo')
-  const testCellId = 'c0000000-0000-0000-0000-000000000000'
 
   useEffect(() => {
     if (demo) {
+      setCellId('c0000000-0000-0000-0000-000000000000')
       setData(DEMO_DATA)
       setSummary(DEMO_NETWORK_SUMMARY)
       setLoading(false)
       return
     }
-    Promise.all([
-      stewardApi.dashboard(testCellId),
-      stewardApi.networkSummary(testCellId),
-    ])
-      .then(([dashboardData, summaryData]) => {
-        setData(dashboardData)
-        setSummary(summaryData)
+
+    // Fetch the real cellId first — this was previously hardcoded to a
+    // demo-only sentinel value even in the non-demo path, which meant
+    // every real user's dashboard call targeted a cell that didn't exist
+    // for them, 404'ing every time. Found via live testing 2026-09-11.
+    api.get<{ role: string; cellId: string | null }>('/me')
+      .then((me) => {
+        if (!me.cellId) {
+          setNoCellYet(true)
+          setLoading(false)
+          return
+        }
+        setCellId(me.cellId)
+        return Promise.all([
+          stewardApi.dashboard(me.cellId),
+          stewardApi.networkSummary(me.cellId),
+        ]).then(([dashboardData, summaryData]) => {
+          setData(dashboardData)
+          setSummary(summaryData)
+        })
       })
       .catch((err) => {
         if (err.message?.includes('403')) {
@@ -197,9 +212,10 @@ export default function StewardDashboard() {
   }, [demo])
 
   if (loading) return <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
-  if (roleGated) return <RoleGateMessage message={t('steward.roleGateMessage', 'This area is for your Cell Steward.')} />
+  if (roleGated) return <InfoMessage message={t('steward.roleGateMessage', 'This area is for your Cell Steward.')} />
+  if (noCellYet) return <InfoMessage message="You're not in a cell yet — once your Node Admin adds you to one, this screen will show what's happening there." />
   if (error) return <div style={{ padding: 24, color: '#C85A3C' }}>Could not load dashboard. {error}</div>
-  if (!data) return <div style={{ padding: 24, color: 'var(--text-muted)' }}>No dashboard data available.</div>
+  if (!data || !cellId) return <div style={{ padding: 24, color: 'var(--text-muted)' }}>No dashboard data available.</div>
 
   const isolates = data.members.filter((m) => m.recentConnections === 0)
 
@@ -244,9 +260,9 @@ export default function StewardDashboard() {
       </section>
 
       {/* Deferred sub-components: Isolates, Hubs, Log Trade */}
-      <IsolateList cellId={testCellId} />
-      <HubList cellId={testCellId} />
-      <LogOfflineTrade members={data.members} cellId={testCellId} />
+      <IsolateList cellId={cellId} />
+      <HubList cellId={cellId} />
+      <LogOfflineTrade members={data.members} cellId={cellId} />
 
       {/* Reciprocity Flags */}
       {data.reciprocityFlags.length > 0 && (
