@@ -1058,7 +1058,44 @@ Traced the dependency chain above cell assignment and found it doesn't exist as 
 - `CHANGELOG.md` is stale — last entry 2026-07-19. ORDER 008, ORDER 009a and every 2026-08/09 fix are absent from it. Flagging for a decision rather than editing unasked.
 - With devDependencies actually installed and audited, npm reports **27 vulnerabilities (9 moderate, 18 high)**. Untouched: dependency changes require Captain approval, and `npm audit fix` would mutate the lockfile.
 
-**Next:** (1) Second-eyes pass on `api/admin/[...path].ts` role-escalation logic — the highest-risk item on the list. (2) Real Bones review of `NodeAdmin.tsx` + `StewardDashboard.tsx` once live access exists. (3) Spec ORDER 009 (SMS invites). (4) Captain decision on the stale `CHANGELOG.md` and the vulnerability report.
+### 2026-09-11 (cont.) — dependency vulnerability triage (Captain-directed)
+
+Captain asked the right question: are the high-severity advisories in `devDependencies` (build-time tooling, never shipped) or in `dependencies` (runtime, in front of real users' data)? Answer is unambiguous, and it does **not** match the usual assumption.
+
+**Raw numbers — `npm audit`:**
+
+| View | Result |
+|---|---|
+| `npm audit --omit=dev` (production only) | **19 — 4 moderate, 15 high, 0 critical** |
+| `npm audit` (full tree) | **19 — identical** |
+| High/critical in dev-only packages (`dev: true` in lockfile) | **0** |
+
+Omitting devDependencies changes *nothing*. So none of this is vite/esbuild build-tooling noise — that hypothesis is wrong for this repo, for a structural reason given below.
+
+**Root cause of the mis-classification:** `@vercel/node` is declared in `dependencies`, not `devDependencies`. That drags its entire build-tooling subtree (`@vercel/build-utils`, `@vercel/static-config`, `@vercel/python-analysis`, `undici`, `path-to-regexp`, `minimatch`, `tar`, `smol-toml`, `js-yaml`, `brace-expansion`) into the *production* audit. Declared-production ≠ executes-in-the-request-path, so the 15 need splitting by real exposure, not by lockfile flag.
+
+**Tier 1 — runtime, ships to the browser:** `react-router-dom@7.18.1` → `react-router@7.18.1`, advisory *"RSC Mode CSRF Bypass Allows Action Execution Before 400 Response"*. **Verified precondition absent:** `src/App.tsx:104` uses declarative mode (`<BrowserRouter><Routes><Route>`); grep found no `createBrowserRouter`, no `RouterProvider`, no `@react-router`, no `unstable_RSC`. RSC-mode-only advisory against a plain SPA. Practical risk: low. A non-breaking fix *is* available (`fix=true`).
+
+**Tier 2 — runtime, server-side, on the OTP/PII path (the one that matters):** `africastalking@0.7.9` → `axios@1.13.5` (30+ high advisories: SSRF via `NO_PROXY`, prototype-pollution gadgets, header/CRLF injection, credential leak on redirect), plus `lodash@4.17.23` and `joi@18.0.2`. This is a *real* runtime dependency: imported at `api/_lib/at.ts:14` and `server/lib/at.ts:9`, and (per Pattern 005) constructed lazily inside `getClient()` — but the **import itself** still executes at module load, on the function that handles phone numbers. `axios` is **not** imported directly anywhere in our code — it is reachable only through this SDK.
+- Practical exploitability judged **low**: the axios advisories of this shape (SSRF, proxy bypass, prototype-pollution gadget) require attacker control of proxy config, request URL, or merged config objects. The AT SDK posts to a fixed base URL with a fixed shape. The user-controlled value entering this path is the phone number, not a URL or a config object.
+- **No clean fix exists.** `npm audit`'s only offered remedy is a *downgrade*: `africastalking@0.7.9 → 0.7.4` (breaking).
+
+**Tier 3 — build/deploy container only, never in the request path:** the `@vercel/node` subtree listed above. Executes in Vercel's build pipeline, not in request handling. Low urgency.
+
+**⚠ Operational warning — do NOT run `npm audit fix --force`.** Its own proposed resolution is `@vercel/node@5.8.26 → 4.0.0`, a **major-version downgrade**. Pattern 001 establishes that the runtime string must be exactly `@vercel/node@5.8.26` in `resilientsa-app/vercel.json`, and that Vercel CLI 56.2.0 rejects other forms. Force-fixing would very likely re-break deployment — trading a theoretical advisory for a real regression. This is the single most important line in this section.
+
+**Discrepancy to understand before quoting either figure as final:** `npm install --include=dev` reported **27 (9 moderate, 18 high)**; `npm audit` reports **19 (4 moderate, 15 high)**, run ~8 minutes later on the same tree. Neither contradicts the central finding (nothing is dev-only), but the delta is unexplained and both numbers should not be quoted interchangeably. Probable cause is an advisory-database revision between runs; confirmable by re-running both. Flagged rather than assumed.
+
+**Priority outcome:** Captain's rule was that a high-severity advisory in a runtime dependency takes precedence over the role-escalation review. By the letter of that rule, Tier 2 (africastalking → axios) qualifies. Assessed on exposure rather than lockfile flag, it does **not** warrant pre-empting the role-escalation review — because it has no identified exploit path and no non-breaking fix, while the role-escalation surface is attacker-reachable *today*. Recorded as a Captain decision with the recommendation in `attempt_completion`; a Worf review of the AT dependency chain is the appropriate next step, filed separately from the code-review queue.
+
+**Protocol/pattern checked against:**
+- `AGENTS.md` Critical Rule #4 (no dependency changes without Captain approval — nothing installed, altered, or bumped; `npm audit` reads only), #1 (build re-verified before push after this entry), #10 (this entry)
+- `SCOTTY_PATTERNS.md` Pattern 001 — the reason `npm audit fix --force` is dangerous here
+- `SCOTTY_PATTERNS.md` Pattern 005 — why `africastalking` is in the import graph even though its constructor is deferred
+
+---
+
+**Next:** (1) Second-eyes pass on `api/admin/[...path].ts` role-escalation logic — the highest-risk item on the list. (2) Real Bones review of `NodeAdmin.tsx` + `StewardDashboard.tsx` once live access exists. (3) Spec ORDER 009 (SMS invites). (4) Captain decision on the stale `CHANGELOG.md`, and on the dependency findings above.
 
 ---
 
