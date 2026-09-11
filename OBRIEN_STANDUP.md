@@ -1,7 +1,7 @@
 # O'BRIEN STANDUP
 **Mission:** ResilientSA
 **Custodian:** O'Brien (Primary Builder)
-**Status:** ACTIVE — CREW-ORDER-002, 003, 004, 005, 006 complete
+**Status:** ACTIVE — orders 002–008 built (007/008 pending a live Bones review), 009a built. O'Brien resumed 2026-09-11 after an offline period 2026-08-31 → 2026-09-10 (Spock stood in directly; see the 2026-09-10 entries below and the interim note in `AGENTS.md`, now historical).
 
 ---
 
@@ -1008,6 +1008,57 @@ Traced the dependency chain above cell assignment and found it doesn't exist as 
 - Bones: no live review possible yet — flagged as owed, not skipped.
 
 **Next:** (1) Captain: log in as the test user, try the real `/admin` flow — create a node, see it appear, and eventually create a cell as a promoted node_admin. (2) Real Bones review of `NodeAdmin.tsx` once there's live access. (3) Spec ORDER 009 proper (SMS invites) — no longer blocked.
+
+---
+
+## 2026-09-11 — O'Brien — back online: sync, build verification, full read-in
+
+**Context:** First O'Brien session since 2026-08-31. The interim arrangement (Spock executing engineering directly, documented in `AGENTS.md`) becomes historical as of this entry. Captain's ordered sequence for this session: sync → build → read in → flag. **No code was changed this session, deliberately** — this was a read-in, not a build.
+
+**What I worked on:**
+- `git status` → clean working tree, nothing to stash.
+- `git fetch origin` + `git reset --hard origin/main` → HEAD moved `acf44d3 → b3b68c0`. All work on main was Spock's interim pushes; there was no local work of mine to reconcile.
+
+**Build verification — the substantive finding of this session:**
+- `npm install` reported **"up to date, audited 265 packages"** — and then `npm run build` **failed**, with `TS2688: Cannot find type definition file for 'vite/client'` plus `TS2307` for `vite`, `@vitejs/plugin-react` and `@tailwindcss/vite`.
+- Root cause, established by inspection rather than guesswork: **`NODE_ENV=production` is set in this shell, and `npm config get omit` returns `dev`.** Every devDependency was silently skipped. `node_modules` contained 224 entries with **no `vite` at all**. `tsc` still executed only because a *transitive* TypeScript (5.9.3 / 6.0.3, arriving via `@vercel/node`, `i18next`, `react-i18next`) happened to be resolvable — not the declared `typescript@~6.0.2`.
+- Fix: `npm install --include=dev` (+73 packages). This installs exactly what `package.json` already declares against the existing lockfile — no new dependency, no version change, so no approval question arises. **It is a local-environment problem, not a repo defect:** `git status --short` afterwards returned clean, so `package-lock.json` was untouched and there is nothing to commit.
+- `npm run build` → **zero errors, 77 modules transformed**, matching what is deployed. The known pre-existing `INEFFECTIVE_DYNAMIC_IMPORT` warning on `src/lib/outbox.ts` (dynamically imported by `TradeExchange.tsx`, statically imported by `Marketplace.tsx`) also reproduces — same warning noted in pt.3, still non-blocking.
+- **Recorded for whoever builds next:** this same `NODE_ENV=production` trap that caused Pattern 003 is now doing something Pattern 003 does not describe — it silently guts the **local** build by suppressing devDependencies. The failure mode is actively misleading: npm says the tree is fine, and the errors name `vite` rather than anything to do with `NODE_ENV`. **If `vite`/`@vitejs` are missing from `node_modules`, check `npm config get omit` before touching any config or adding dependencies.**
+
+**Undocumented change found on main — no log entry existed anywhere:**
+- Commit `b3b68c0` (Fri 2026-09-11 11:36 +0200): `StewardDashboard.tsx` was calling the API with a demo-only sentinel `cellId` (`c0000000-…-000000000000`) **even in the non-demo path**, so every real user hitting `/steward` received a 404. Now fetches the real `cellId` from `/api/me` first, and adds an explicit "you're not in a cell yet" state, distinct from both a role gate and a real error.
+- Grepped `OBRIEN_STANDUP.md` and `CHANGELOG.md` for "sentinel" and "2026-09-11": **no match in either.** That session of engineering had no record in any tracking file. Documented here retrospectively so it is not lost.
+- Its own commit message is worth quoting, because it is the lesson: *"This was introduced during today's earlier Bones-fix rewrite of this component and went live-untested until now — should have been caught before calling ORDER 007's Bones items 'fixed.'"*
+- I spot-checked the blast radius in `src/`: the sentinel now appears **only** inside the demo branch (gated on `?demo`). `TradeExchange.tsx` uses a different demo-only placeholder (`'demo-cell'`). No remaining non-demo use found. Separately noted: demo gating is implemented through **two different mechanisms** (`useDemoMode()` in `App.tsx` vs direct `URLSearchParams` reads in `TradeExchange.tsx`, `GiftsCapture.tsx`, `StewardDashboard.tsx`) — a drift risk rather than a bug today.
+
+**What's now complete and where it lives:**
+- Local build verified green against current `main` (77 modules). No repo changes required.
+- Read in full this session: `MISSION_STATUS.md`, all six 2026-09-10 standup entries + the 2026-09-10 pt.6 closing, `CREW_ORDERS/CREW-ORDER-009a.md`, `BONES_VERDICT.md`, `SCOTTY_PATTERNS.md` (Patterns 001–007), `CHANGELOG.md`.
+
+**What's blocked, and on whom:**
+- Nothing blocked on me. Read-in complete; no source touched.
+
+**Protocol/pattern checked against:**
+- `AGENTS.md` Session Start Protocol steps 1–4; Critical Rules #1 (build run, zero errors), #2/#5 (read-only session; I deliberately did **not** open `kilo.jsonc` or `.env.local`, as both may contain credentials), #10 (this entry).
+- `SCOTTY_PATTERNS.md` Patterns 001–007 read in full before touching anything. Pattern 003 is the nearest existing pattern and was directly relevant — with the caveat above that it documents the *deployment* consequence of `NODE_ENV=production`, not the local-build consequence.
+- `CREW_ORDERS/CREW-ORDER-009a.md` §4 (Worf Brief) and §6.2 — read specifically to understand the admin surface I am being asked to second-eyes.
+
+**Anything flagged to Worf or Bones:**
+- **Bones — owed twice over.** ORDER 007 and ORDER 008 still have no live/visual verdict; both 2026-09-10 verdicts are explicitly source-level only. And ORDER 007's addendum is now known to have been premature: the sentinel bug was *introduced by* the Bones-fix rewrite and only caught on 2026-09-11 by live testing. The addendum's "all five fixed" should therefore be read as **"five fixes landed, one of which broke the screen for every real user, since repaired"** — not as a closed item. `NodeAdmin.tsx` is harder still: no prototype exists for it at all, so its review is a from-scratch judgement call.
+- **Worf — for awareness, not a finding.** Client-side `ProtectedRoute` can be satisfied by a `?demo` URL parameter (`setDemoSession()` in `src/lib/session.ts`). I have not traced whether that reaches any real API data; it appears to serve demo data only. But a route guard whose gate is a query string deserves a deliberate look **before** real Delft onboarding, not after.
+
+**Open items I am carrying forward (from Captain's brief — all still owed, none started):**
+1. **Real Bones review** of `NodeAdmin.tsx` and `StewardDashboard.tsx` against the **live** app. Everything to date is source-level review; no screenshot or browser access existed in those sessions.
+2. **`api/admin/[...path].ts` role-escalation logic — second pair of eyes.** This is the highest-privilege surface in the platform so far: unlike every prior gate, which only *checked* a role, this one *grants* roles and moves users between nodes. Includes `setMemberRole` (must never accept `node_admin`/`regional_steward`/`grounder`), the cross-node ownership checks, and `createNode`'s "already an admin elsewhere" rejection.
+3. **ORDER 009 (SMS invites) — now unblocked and ready to spec.** Its blocker (009a) is built.
+4. **Hardcoded-credential pattern — internalise it.** Six instances were found on 2026-09-10, not one. Two rules follow: any new one-off script uses `process.env.DATABASE_URL` plus a startup guard, never a literal; and sweep the **whole repo** rather than stopping at the first fix — pt.2 recorded this item as "resolved" after fixing a single file, and it was not.
+
+**Also noted, deliberately not acted on (no order covers it):**
+- `CHANGELOG.md` is stale — last entry 2026-07-19. ORDER 008, ORDER 009a and every 2026-08/09 fix are absent from it. Flagging for a decision rather than editing unasked.
+- With devDependencies actually installed and audited, npm reports **27 vulnerabilities (9 moderate, 18 high)**. Untouched: dependency changes require Captain approval, and `npm audit fix` would mutate the lockfile.
+
+**Next:** (1) Second-eyes pass on `api/admin/[...path].ts` role-escalation logic — the highest-risk item on the list. (2) Real Bones review of `NodeAdmin.tsx` + `StewardDashboard.tsx` once live access exists. (3) Spec ORDER 009 (SMS invites). (4) Captain decision on the stale `CHANGELOG.md` and the vulnerability report.
 
 ---
 
