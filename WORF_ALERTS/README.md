@@ -32,4 +32,14 @@ Per `CREW_MANIFEST.md`: Critical or High severity findings are escalated to Capt
 
 ---
 
-*No alerts filed yet.*
+## Alerts on file
+
+| Date | File | Status |
+|---|---|---|
+| 2026-07-02 | [`2026-07-02-order003-schema-review.md`](2026-07-02-order003-schema-review.md) | Resolved — ALL CLEAR |
+| 2026-07-02 | [`2026-07-02-order004-auth-review.md`](2026-07-02-order004-auth-review.md) | Resolved — CONDITIONAL PASS |
+| 2026-08-17 | [`2026-08-17-order008-hardcoded-db-url.md`](2026-08-17-order008-hardcoded-db-url.md) | Resolved 2026-09-10 — credential removed from source; inert in git history |
+| 2026-09-10 | [`2026-09-10-second-hardcoded-credential-instance.md`](2026-09-10-second-hardcoded-credential-instance.md) | Resolved — scope corrected to six instances, ALL CLEAR for source |
+| 2026-09-11 | [`2026-09-11-order009a-role-escalation-review.md`](2026-09-11-order009a-role-escalation-review.md) | **OPEN** — Critical (CRIT-001, platform-wide RLS) + Medium ×4 |
+
+*Index maintained by hand — add a row when filing a new alert. Corrected 2026-09-11: this section previously read "No alerts filed yet" while four alerts were on disk.*
