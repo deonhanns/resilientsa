@@ -1124,7 +1124,7 @@ Omitting devDependencies changes *nothing*. So none of this is vite/esbuild buil
 **6. CHANGELOG brought current** — one consolidated entry covering ORDER 008 → today, pointing here for detail rather than duplicating it, per Captain direction.
 
 **Protocol/pattern checked against:**
-- `AGENTS.md` Critical Rules #1 (build re-verified before this push), **#3 (no schema change made** — the 009a review is read-only, and ORDER 009 is a draft *precisely because* the schema change it needs is Spock's to approve**)** , #10 (this entry)
+- `AGENTS.md` Critical Rules #1 (build re-verified before this push), **#3 — no schema change made**: the 009a review is read-only, and ORDER 009 is a draft *precisely because* the schema change it needs is Spock's to approve, and #10 (this entry)
 - `SCOTTY_PATTERNS.md` Patterns 001, 003, 005 and 006 — all four are load-bearing for the ORDER 009 draft
 - `CREW-ORDER-009a.md` §4 and §6.2 as the review standard
 - Read `session.ts`, `db-context.ts`, `db.ts` and the `users`/`nodes`/`cells` schemas *before* asserting anything about isolation
