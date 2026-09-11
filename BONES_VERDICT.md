@@ -237,3 +237,86 @@ All five required items were fixed immediately following this verdict:
 "My community can get support for what we need. It's clear what's available and how to ask." The entry question, pillar grid reuse, and warm empty/confirmation states land this well. The naming discipline (never "Marketplace," never "Grounder") is followed precisely — this was the order's trickiest constraint and it holds up under a direct code read.
 
 **Bones sign-off: CONDITIONAL PASS — merge when offline-cache gap is acknowledged as a tracked follow-up, not treated as done.**
+
+---
+
+# Bones Verdict — RE-REVIEW of ORDER 007 + first review of ORDER 009a, against the live rendered app
+**Date:** 2026-09-11
+**Build Reviewed:** ORDER 007 (StewardDashboard + IsolateList/HubList), ORDER 009a (NodeAdmin), and the ORDER 004 auth screen as a control
+**Reviewer:** O'Brien — **partial live pass.** Production app driven in headless Chromium 153 (Playwright 1.63.0) at a 390×844 mobile viewport against `https://resilientsa.vercel.app`. The DOM, rendered text and **computed CSS** were read directly from the live page.
+
+### Read this before the verdict — what this pass is and is not
+
+**It is not a human visual pass, and I am not claiming one.** My model cannot view images — attempting to read the captured PNG returned *"Image file detected but current model does not support images."* So I can attest to **what is on the screen and what its computed styles are**, which is a large step beyond the 2026-09-10 source-only verdicts. I **cannot** attest to typography, spacing, hierarchy, visual balance, or whether it *feels* warm — those need human eyes.
+
+Screenshots were captured and are available for the Captain to review:
+- `/tmp/resa-shots/steward-demo.png` (62 KB)
+- `/tmp/resa-shots/admin-demo.png` (15 KB)
+
+**Coverage limit:** the authenticated states were not reachable in this session — `/steward` and `/admin` were reviewed in **demo mode** (`?demo`), which renders `DEMO_DATA` rather than live API data. That validates layout, copy, colour and interaction for those screens; it does **not** exercise the real data-driven states or the role-specific views of `NodeAdmin` (regional_steward and node_admin consoles were never rendered — demo session is `cell_steward`, so only the role-gate path was seen).
+
+### What is now CONFIRMED against the live DOM — ORDER 007
+
+The 2026-09-10 verdict's two hard FAILs both hold up live:
+
+| Requirement | Source verdict | **Live evidence** |
+|---|---|---|
+| NeedsRadar must not render raw counts — size alone carries urgency | ❌ FAIL (2026-09-10) | ✅ **CONFIRMED FIXED.** The Safety circle is `<button title="Safety: 1" aria-label="Safety: 1" style="width:47px;height:47px;border-radius:50%;background-color:rgb(200,90,60);border:3px solid …">` with **empty rendered text**. The count is exposed only through `title`/`aria-label`, exactly as required. |
+| No red/alert colour for isolate flags — ochre only | ❌ FAIL (2026-09-10) | ✅ **CONFIRMED FIXED.** Ochre `#E6A854` is computed on **19** elements. The only rust `#C85A3C` element rendered is the Safety pillar's own NeedsRadar circle — a legitimate pillar token, not an isolate element. |
+
+Also confirmed live:
+- Warm isolate copy renders as **"2 out of touch"** — not "isolates detected" ✅
+- NeedsRadar instruction renders in full: *"Tap an area to see what's unmet. Bigger circles need you most."* ✅
+- Heading is the cell name (**"Khayelitsha Cell A"**), no "Dashboard" language anywhere ✅
+- No node-link graph ✅
+- Body background computes to `rgb(244, 244, 242)` — Canvas Grey ✅
+- `BottomNav` is live with three destinations: 🏠 Exchange → `/trade`, 🤝 Get support → `/support`, 👥 Steward → `/steward` ✅
+- `/join` renders exactly the Bones-approved ORDER 004 copy: *"Join your community" / "We'll send a code to your phone" / "Send my code"* ✅ (control case)
+
+**One thing I could NOT confirm.** `/steward?demo` displays *"Your cell is just getting started — most members haven't connected yet."* That is `DEMO_DATA`'s canned message, **not** evidence that the network-summary fix failed — in demo mode the component short-circuits before fetching. Confirming the real `GET /steward/network-summary/:cellId` renders correctly **requires an authenticated visit**. Recording it explicitly so this is not mis-read as a regression.
+
+### ORDER 007 — verdict revised
+
+**CONDITIONAL PASS**, upgraded from NEEDS REVISION. Both hard FAILs are confirmed fixed against the live DOM. Outstanding conditions:
+1. Authenticated confirmation that the real network-summary endpoint renders (not `DEMO_DATA`).
+2. Human visual confirmation of typography/spacing — I could not assess these.
+3. `BN-LIVE-03` and `BN-LIVE-04` below.
+
+### ORDER 009a (NodeAdmin) — first review, NEEDS REVISION
+
+Live role-gate confirmed working: a `cell_steward` session hitting `/admin` renders **"This area is for Node and Regional coordination."** with the warm 🌱 treatment — not a 403 page, exactly as briefed ✅.
+
+But two genuine problems, both of which a source-only review structurally could not have caught:
+
+**BN-LIVE-01 — `/admin` is unreachable by navigation. (High)**
+The rendered navigation contains **only** `/trade`, `/support`, `/steward`. There is no link to `/admin` anywhere in the app. A `regional_steward` or `node_admin` therefore has **no in-app path** to the console that ORDER 009a built specifically for them. They would have to know to type the URL.
+This fails Bones test 2 (*clear on first encounter*) and test 4 (*would a stretched Node Admin trust it on first use*) — by a stretched Node Admin who cannot find the screen at all. The route exists and is correctly gated; it is simply not discoverable.
+Fix: a conditional nav entry for admin roles, or a link from `/steward`, or routing an admin to `/admin` after their role is granted.
+
+**BN-LIVE-02 — the role gate cannot distinguish "not authorised" from "request failed". (Medium)**
+[`NodeAdmin.tsx:275`](resilientsa-app/src/components/admin/NodeAdmin.tsx:275) does `api.get('/me').then(me => setRole(me.role)).catch(() => setRole(null))`, then [`:283`](resilientsa-app/src/components/admin/NodeAdmin.tsx:283) renders `RoleGateMessage` whenever the role is not admin. So a **network error, 401 or 500 all tell a legitimate administrator "This area is for Node and Regional coordination."** Observed live: `/api/me` returned 401 and the role-gate message appeared.
+This is the same defect family as `SCOTTY_PATTERNS.md` Pattern 007 — a failure state rendered as though it were a true state. The fix applied to `/steward` on 2026-09-10 (a specific 403 branch, distinct from the generic error state) was not carried across to `/admin`.
+
+**BN-LIVE-03 — `IsolateList` still styles its own surface in `#C85A3C`. (Medium — needs a judgement call, not a mechanical fix)**
+[`IsolateList.tsx:35`](resilientsa-app/src/components/steward-dashboard/IsolateList.tsx:35), [`:61`](resilientsa-app/src/components/steward-dashboard/IsolateList.tsx:61) and [`:62`](resilientsa-app/src/components/steward-dashboard/IsolateList.tsx:62) use `#C85A3C` for the "Reach out" nudge button and its label. The 2026-09-10 fix named only `MemberRow`'s status dot/badge and the dashboard isolate badge — it did not cover the isolate list itself. The brief says *"No red/alert colours for isolate flags — ochre only."* Since this is the locate surface itself, it warrants an explicit ruling rather than an assumption in either direction. (Not visible in the captured screenshots — the section is collapsed by default.)
+
+**BN-LIVE-04 — the design system has one ochre doing two jobs. (Low, but the root cause of the above)**
+[`src/styles/index.css:43`](resilientsa-app/src/styles/index.css:43) defines `--color-signal-urgent: #C85A3C` while [`src/styles/colors.css:23`](resilientsa-app/src/styles/colors.css:23) defines `--ochre: #C85A3C /* Ochre Earth */`. **The same hex is simultaneously "the warm ochre" and "the urgent signal."** The 2026-09-10 brief's distinction between acceptable ochre (`#E6A854`) and the anti-pattern therefore rests entirely on *which of two ochres* was meant, and a reader of the code cannot tell. Recommend separating the urgent signal from Ochre Earth so this class of confusion stops recurring. Same family: [`StewardDashboard.tsx:21`](resilientsa-app/src/components/steward-dashboard/StewardDashboard.tsx:21) uses `#C85A3C` as the `declining` trend colour — the same value as the error text at [`:217`](resilientsa-app/src/components/steward-dashboard/StewardDashboard.tsx:217).
+
+**BN-LIVE-05 — demo-mode only, recorded so it is not mistaken for a bug. (Low)**
+`/steward?demo` issues two failing calls: `404 /api/steward/hubs/c0000000-…-000000000000` and `404 /api/steward/isolates/c0000000-…-000000000000`. Expected: demo mode sets the all-zeros sentinel cellId and that cell does not exist server-side. **Not** a recurrence of the `b3b68c0` sentinel bug — [`StewardDashboard.tsx:263`](resilientsa-app/src/components/steward-dashboard/StewardDashboard.tsx:263)–`265` passes the real `cellId` to `IsolateList`/`HubList`/`LogOfflineTrade`, and the sentinel now appears only inside the `demo` branch at [`:176`](resilientsa-app/src/components/steward-dashboard/StewardDashboard.tsx:176).
+
+### ORDER 008 (Community Marketplace) — NOT REVIEWED in this pass
+`/support` was not visited with data. The 2026-09-10 CONDITIONAL PASS stands unchanged and still needs a live look.
+
+### Emotional target assessment — partial, and I want to be honest about it
+The live text supports the intended tone: warm isolate copy, plain-language activity lines, no "dashboard" or "admin panel" language, and an encouraging rather than scolding NeedsRadar instruction. But *"I know what's happening in my cell right now"* and *"I can see exactly who's in my community"* are judgements about a rendered screen's effect on a person, and I cannot make them from `innerText`. **BN-LIVE-01 is the strongest evidence I can offer here without eyes: an admin who cannot find their console will not feel capable — they will feel lost.** The rest is owed to a human.
+
+### Required before this can move to PASS
+1. **Fix BN-LIVE-01** — no admin can reach `/admin`. This is the one that costs something real.
+2. **Fix BN-LIVE-02** — separate "not authorised" from "request failed" on `/admin`, mirroring the `/steward` fix.
+3. **Rule on BN-LIVE-03 / BN-LIVE-04** — pick the ochre, and separate `--color-signal-urgent` from Ochre Earth.
+4. **Authenticated live pass** — confirm the real network-summary renders, and render both `NodeAdmin` consoles (regional_steward and node_admin), which were never seen.
+5. **Human visual pass** — typography, spacing, hierarchy, dignity.
+
+**Bones sign-off: PARTIAL LIVE PASS — ORDER 007 CONDITIONAL PASS (upgraded from NEEDS REVISION); ORDER 009a NEEDS REVISION. Not a substitute for human eyes; authenticated states and both admin consoles remain unseen.**
