@@ -153,5 +153,34 @@ Verified on a Vercel **Preview** deployment — branch `probe/order-010-routing-
 
 ---
 
+## §4 UPDATE — 2026-09-12: Path A TESTED on Preview and **REFUTED**. Converting to Path B.
+
+Two variants, both deployed as real Vercel Preview builds, both probed live.
+
+| Variant | Config change | Deploy | depth-1 route | **depth-2 route** | `/api/auth/request-code` |
+|---|---|---|---|---|---|
+| **A1** | glob kept, runtime pin replaced with `memory: 1024` | Ready | 401 ✅ | **404 platform ❌** | 405 ✅ |
+| **A2** | `functions` glob **removed entirely** | Ready | 401 ✅ | **404 platform ❌** | 405 ✅ |
+
+Nested non-catch-all control (`POST /api/trade-completions/x/confirm-fairness`) returned **401** on both, so both deployments were healthy.
+
+### Findings
+
+1. **The runtime pin is NOT required.** Both variants built and deployed Ready without `@vercel/node@5.8.26`. Pattern 001's runtime-version constraint is obsolete under Vercel CLI 59.1.3 for this project. `SCOTTY_PATTERNS.md` Pattern 001 should be corrected when this order closes.
+2. **The `functions` glob is NOT the cause.** Removing it entirely leaves behaviour identical — depth-1 routes, depth-2 platform-404s. §1's hypothesis, and Path A's entire premise, is **refuted**.
+3. **The detection risk I raised did not materialise.** With the glob gone the API is still auto-detected and every sampled route still works, so the glob is not load-bearing for detection either. Risk retired.
+
+So the mechnanism is still not identified at root, but the **symptom is fully characterised**: only `[...path]`-style catch-alls are affected, they match exactly one segment, and genuinely nested files route correctly at any depth. That is enough to choose Path B on evidence rather than theory — which is what §3's discipline was for.
+
+### Path B — the order's math is wrong, and it matters
+
+§5 assumed a current count of **8** functions (→ `8 − 1 + 6 = 13`, one over the Hobby limit). The actual count is **9** — admin, auth, gifts-profile/me, listings, marketplace, matches, me, steward, trade-completions — confirmed two ways (files on disk, and Vercel's own build output listing `5 shown + 4 hidden`).
+
+**So the order's six-file conversion yields `9 − 1 + 6 = 14` — two over the limit, not one.** §5 says that before Path B can ship, either an existing route must be consolidated to free a slot, or the Captain decides whether a plan upgrade is on the table (explicitly a business decision, not an engineering one).
+
+**This is being flagged rather than decided unilaterally**, because §5's specified file list would now need *two* consolidations rather than the one it anticipated. There is a lower-risk design available that avoids both consolidations and needs no plan upgrade — raising it for confirmation rather than restructuring the order's specified file layout on my own initiative.
+
+---
+
 **O'Brien**
 *Live verification, 2026-09-11, Captain-directed. Not a Worf sign-off — Worf has not reviewed this document.*
