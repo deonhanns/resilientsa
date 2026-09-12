@@ -124,5 +124,34 @@ If the Captain prefers to classify it High on the letter of the guide, the *acti
 | Live route smoke test as a standing check | O'Brien (once ordered) | Open |
 | Cross-node rejection + role allowlist runtime verification | nobody — blocked by this defect | Open |
 
+## §3 UPDATE — 2026-09-12: mechanism CONFIRMED live; the original hypothesis is refuted in its mechanism
+
+Verified on a Vercel **Preview** deployment — branch `probe/order-010-routing-diagnostic`, deployment `resilientsa-i9yvumhji-…`, status Ready. A temporary `?__diag=1` branch was added to the steward catch-all; it returns before any auth or segment logic, so if the function ran at all it would have answered.
+
+**Depth 1 — `/api/steward/xyz?__diag=1` → HTTP 200, diagnostic fired:**
+```json
+{"url":"/api/steward/xyz?__diag=1&...path=xyz","rawQuery":{"__diag":"1","...path":"xyz"},
+ "rawQueryKeys":["__diag","...path"],"pathValue":null,"dottedPathValue":"xyz",
+ "pathIsArray":false,"dottedPathIsArray":false,"segments":["xyz"],"segmentCount":1}
+```
+
+**Depth 2 — `/api/steward/dashboard/fake-id?__diag=1` → HTTP 404, Vercel's HTML NOT_FOUND page. The diagnostic did NOT fire.** Depth 3 → 404.
+**Control, same preview — `POST /api/trade-completions/x/confirm-fairness` → HTTP 401 (reached handler).**
+
+### What this establishes
+
+1. **It is NOT truncation.** §1 hypothesised the captured value was truncated to `['dashboard']` with the cellId dropped. Had that been true the function would still have been *invoked*, and my diagnostic — which responds before any auth or segment parsing — would have answered. It did not. A 2+ segment path matches **no route at all**; the function is never called, and the platform's own 404 page proves it.
+2. **The catch-all is behaving as a single-segment dynamic route.** Depth 1 is delivered by Vercel *rewriting* the segment into a query parameter — visible in the captured `url` as `...path=xyz`. That parameter name is mangled (literal `'...path'`), which is exactly why Pattern 006's two-key fallback was needed to make even depth-1 work.
+3. **The captured value is a plain string, never an array** (`Array.isArray` false at depth 1). Vercel is not performing multi-segment collection at all.
+4. **The `functions` glob remains the prime suspect as the *cause*** — a mangled, single-segment rewrite is what you would expect if that glob's registration bypasses normal bracket-syntax parsing. But this experiment does **not** by itself prove causation; that needs the Path A test.
+
+### New risk identified for Path A — must be verified both ways on preview
+
+**The glob may be load-bearing for API *detection*, not merely for the runtime pin.** The API lives at `resilientsa-app/api`, not at a project-root `/api`, and there is **no root `api` symlink** (Pattern 001's symlink is gone from the repo). Vercel's filesystem auto-detection looks for `/api` *at the deployment root*. So removing the `functions` glob may de-register **every** API route rather than fix routing. Path A must therefore be tested on preview for both outcomes: (a) does the runtime still resolve, and (b) do the API routes still exist at all.
+
+**Status:** §3 complete — cause confirmed and logged before any fix was written, per CREW-ORDER-010 §3 and milestone 1.
+
+---
+
 **O'Brien**
 *Live verification, 2026-09-11, Captain-directed. Not a Worf sign-off — Worf has not reviewed this document.*

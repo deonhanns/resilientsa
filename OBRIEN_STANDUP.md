@@ -1187,7 +1187,37 @@ Full record: [`WORF_ALERTS/2026-09-11-catchall-routing-depth-failure.md`](WORF_A
 - **Bones — the design verdicts stand, but their runtime basis does not.** ORDER 007's "fixes verified" cannot have executed in production. `NodeAdmin.tsx`'s member-assignment and "Make Cell Steward" UI will silently fail for every user.
 - **A standing gap worth fixing:** nothing in the current process — build, typecheck, source review, milestone tables — can detect a route that 404s in production. A live route smoke test in `scripts/` would have caught this. Recommend it as a standing check.
 
-**Next:** (1) Captain/Spock: Crew Order for the catch-all routing defect — highest priority. (2) Spock: Crew Order for CRIT-001. (3) Human visual pass on the two screenshots; then the authenticated pass and both NodeAdmin consoles once routing is fixed. (4) Captain: review/approve ORDER 009; POPIA ruling; AT sender-ID registration.
+### 2026-09-12 — CREW-ORDER-010 §3: root cause CONFIRMED live (hypothesis corrected), before any fix
+
+**Executed §3 exactly as ordered — diagnostic first, no fix written yet.**
+
+**Setup:** probe branch `probe/order-010-routing-diagnostic`, a temporary `?__diag=1` early-return added to [`api/steward/[...path].ts`](resilientsa-app/api/steward/[...path].ts:367). It responds *before* any auth or segment logic, so if the function is invoked at all it must answer. Deployed as a **Preview** (`resilientsa-i9yvumhji-…`, Ready). Diagnostic is branch-only — `grep` confirms `main` is clean.
+
+**Result — depth 1, `/api/steward/xyz?__diag=1` → HTTP 200:**
+```json
+{"url":"/api/steward/xyz?__diag=1&...path=xyz","rawQueryKeys":["__diag","...path"],
+ "pathValue":null,"dottedPathValue":"xyz","pathIsArray":false,"dottedPathIsArray":false,
+ "segments":["xyz"],"segmentCount":1}
+```
+**Depth 2, `/api/steward/dashboard/fake-id?__diag=1` → HTTP 404, Vercel's HTML page — the diagnostic did NOT fire.** Depth 3 → 404. **Control on the same preview:** `POST /api/trade-completions/x/confirm-fairness` → **401, reached the handler.**
+
+**Verdict on the §1 hypothesis: the mechanism is REFUTED; the `functions` glob stays the prime suspect as the cause.**
+- If the capture were merely *truncated* to `['dashboard']`, the function would still have been **invoked** and my diagnostic would have answered. It did not — so a 2+ segment path matches **no route**, and the function is never called.
+- The catch-all is behaving as a **single-segment dynamic route**; depth 1 is delivered by Vercel rewriting the segment into a query param, visible in the captured `url` as `...path=xyz`. That mangled param name is the same anomaly Pattern 006 found — so Pattern 006 patched the *symptom* on depth-1 and could never have reached this.
+- Captured value is a **plain string, never an array** — no multi-segment collection is happening.
+
+**New risk found for Path A, which I must verify before trusting it:** the glob may be load-bearing for API **detection**, not just the runtime pin. The API lives at `resilientsa-app/api`, not a project-root `/api`, and Pattern 001's root `api` symlink is **gone** (confirmed: no `api` symlink at root). Vercel's auto-detection looks for `/api` at the deployment root — so removing the glob could de-register **every** API route instead of fixing routing. Path A's preview test must therefore check both: does the runtime still resolve, **and** do the routes still exist.
+
+**Two corrections to the order's premises, recorded rather than assumed:**
+- **Function count is 9, not 8.** Confirmed two ways — files on disk, and Vercel's own build output (`5 shown + 4 hidden`): admin, auth, gifts-profile/me, listings, marketplace, matches, me, steward, trade-completions. So Path B's math is **9 − 1 + 4 + 2 = 14**, i.e. **two** over the Hobby limit of 12, not one.
+- **`resilientsa-app/vercel.json` has no `functions` config at all** — the runtime pin now lives *only* in root [`vercel.json`](vercel.json:5). That inverts Pattern 001's "Do NOT put `functions` config in root `vercel.json`" guidance, which is now stale and should be corrected when this order closes.
+- Also noted: `api/tsconfig.json` emits **TS5107** (`moduleResolution=node10` deprecated, will break in TypeScript 7.0). Pre-existing, unrelated, but it will bite later.
+
+Full record: [`WORF_ALERTS/2026-09-11-catchall-routing-depth-failure.md`](WORF_ALERTS/2026-09-11-catchall-routing-depth-failure.md:129).
+
+**Protocol/pattern checked against:** `AGENTS.md` #1 (build verified before push), #2/#5 (branch only, no secrets), #10 (this entry) · `SCOTTY_PATTERNS.md` Patterns 001 and 006 — 001 now confirmed stale on the `functions` location, 006 now confirmed to have patched only the depth-1 symptom · `CREW-ORDER-010` §3 and milestones 1–2.
+
+**Next:** (1) Path A preview test — remove/narrow the `functions` glob on a probe branch, verify BOTH the runtime resolves AND the API routes still exist, then whether depth-2 routes. (2) If Path A fails, Path B with the corrected 14-function math and a consolidation plan. (3) Live-test all six affected routes. (4) Smoke-test script.
 
 ---
 
