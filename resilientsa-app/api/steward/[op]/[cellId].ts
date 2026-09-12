@@ -1,36 +1,37 @@
-// api/steward/[...path].ts
-// Vercel serverless catch-all — /api/steward/*
-// Consolidates ORDER 007's steward handlers into ONE function (function-count
-// consolidation to stay under the Vercel Hobby 12-function limit, Spock-approved).
+// api/steward/[op]/[cellId].ts
+// Vercel serverless function — GET /api/steward/:op/:cellId
 //
-// Internal routing (path segments from req.query.path):
+// CREW-ORDER-010 Path B. Extracted from `api/steward/[...path].ts`, whose catch-all
+// only ever matched ONE path segment, so every 2-segment steward route returned
+// Vercel's platform 404 and was unreachable in production. See
+// WORF_ALERTS/2026-09-11-catchall-routing-depth-failure.md.
+//
+// A genuinely nested file routes correctly at any depth (the working precedent is
+// api/trade-completions/[match_id]/confirm-fairness.ts). One dynamic `[op]` file
+// serves all four steward routes instead of four separate files — which keeps the
+// function count unchanged rather than pushing it over the Hobby limit.
+//
 //   dashboard/:cellId        -> GET /api/steward/dashboard/:cellId
 //   isolates/:cellId         -> GET /api/steward/isolates/:cellId
-//   hubs/:cellId              -> GET /api/steward/hubs/:cellId
-//   network-summary/:cellId   -> GET /api/steward/network-summary/:cellId
+//   hubs/:cellId             -> GET /api/steward/hubs/:cellId
+//   network-summary/:cellId  -> GET /api/steward/network-summary/:cellId
+//
+// Logic is ported verbatim from the catch-all. No behavioural change.
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSession, unauthorized, forbidden } from '../_lib/session'
-import { withRLSContext } from '../_lib/db-context'
-import { db } from '../_lib/db'
-import { users } from '../../src/db/schema/public/users'
-import { cells } from '../../src/db/schema/public/cells'
-import { giftsProfiles } from '../../src/db/schema/public/gifts-profiles'
-import { listings } from '../../src/db/schema/public/listings'
-import { connectionEvents } from '../../src/db/schema/public/connection-events'
-import { tradeCompletions } from '../../src/db/schema/public/trade-completions'
+import { getSession, unauthorized, forbidden } from '../../_lib/session'
+import { withRLSContext } from '../../_lib/db-context'
+import { db } from '../../_lib/db'
+import { users } from '../../../src/db/schema/public/users'
+import { cells } from '../../../src/db/schema/public/cells'
+import { giftsProfiles } from '../../../src/db/schema/public/gifts-profiles'
+import { listings } from '../../../src/db/schema/public/listings'
+import { connectionEvents } from '../../../src/db/schema/public/connection-events'
+import { tradeCompletions } from '../../../src/db/schema/public/trade-completions'
 import { eq, and, gte, count, desc, sql } from 'drizzle-orm'
 
 type SessionCtx = { userId: string; userRole: string; nodeId: string }
 
-function segments(req: VercelRequest): string[] {
-  // See SCOTTY_PATTERNS.md Pattern 006: this deployment's routing passes
-  // the catch-all param through with its literal '...' prefix still
-  // attached (req.query['...path'] instead of req.query.path).
-  const p = req.query.path ?? (req.query as Record<string, unknown>)['...path']
-  if (Array.isArray(p)) return p as string[]
-  if (typeof p === 'string') return [p]
-  return []
-}
+const DEMO_SENTINEL_CELL_ID = 'c0000000-0000-0000-0000-000000000000'
 
 function isStewardOrAdmin(role: string): boolean {
   return role === 'cell_steward' || role === 'node_admin'
@@ -39,7 +40,7 @@ function isStewardOrAdmin(role: string): boolean {
 // GET /api/steward/dashboard/:cellId
 async function dashboard(req: VercelRequest, res: VercelResponse, cellId: string, session: SessionCtx) {
   // Guard against placeholder/invalid cell IDs
-  if (cellId === 'c0000000-0000-0000-0000-000000000000') {
+  if (cellId === DEMO_SENTINEL_CELL_ID) {
     return res.json({
       cellName: 'Demo Cell',
       members: [],
@@ -137,7 +138,7 @@ async function dashboard(req: VercelRequest, res: VercelResponse, cellId: string
 
 // GET /api/steward/isolates/:cellId
 async function isolates(req: VercelRequest, res: VercelResponse, cellId: string, session: SessionCtx) {
-  if (cellId === 'c0000000-0000-0000-0000-000000000000') {
+  if (cellId === DEMO_SENTINEL_CELL_ID) {
     return res.json({ isolates: [], count: 0, lastChecked: new Date().toISOString() })
   }
 
@@ -187,7 +188,7 @@ async function isolates(req: VercelRequest, res: VercelResponse, cellId: string,
 
 // GET /api/steward/hubs/:cellId
 async function hubs(req: VercelRequest, res: VercelResponse, cellId: string, session: SessionCtx) {
-  if (cellId === 'c0000000-0000-0000-0000-000000000000') {
+  if (cellId === DEMO_SENTINEL_CELL_ID) {
     return res.json({ hubs: [], burnoutRisk: false })
   }
 
@@ -296,7 +297,7 @@ function pickMessage(phase: Phase, trend: Trend, weekConnections: number): strin
 
 // GET /api/steward/network-summary/:cellId
 async function networkSummary(req: VercelRequest, res: VercelResponse, cellId: string, session: SessionCtx) {
-  if (cellId === 'c0000000-0000-0000-0000-000000000000') {
+  if (cellId === DEMO_SENTINEL_CELL_ID) {
     return res.json({
       phase: 'scattered', trend: 'stable',
       message: "Your cell is just getting started — most members haven't connected yet.",
@@ -372,14 +373,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!isStewardOrAdmin(session.userRole)) return forbidden(res)
 
   const ctx = session as SessionCtx
-  const seg = segments(req)
-  const [p0, p1] = seg
+  const op = req.query.op as string
+  const cellId = req.query.cellId as string
 
-  if (!p0) return res.status(404).json({ error: 'Not found' })
-  if (p0 === 'dashboard' && p1) return dashboard(req, res, p1, ctx)
-  if (p0 === 'isolates' && p1) return isolates(req, res, p1, ctx)
-  if (p0 === 'hubs' && p1) return hubs(req, res, p1, ctx)
-  if (p0 === 'network-summary' && p1) return networkSummary(req, res, p1, ctx)
+  if (!op || !cellId) return res.status(404).json({ error: 'Not found' })
+
+  if (op === 'dashboard') return dashboard(req, res, cellId, ctx)
+  if (op === 'isolates') return isolates(req, res, cellId, ctx)
+  if (op === 'hubs') return hubs(req, res, cellId, ctx)
+  if (op === 'network-summary') return networkSummary(req, res, cellId, ctx)
 
   return res.status(404).json({ error: 'Not found' })
 }
