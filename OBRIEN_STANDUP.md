@@ -1217,7 +1217,41 @@ Full record: [`WORF_ALERTS/2026-09-11-catchall-routing-depth-failure.md`](WORF_A
 
 **Protocol/pattern checked against:** `AGENTS.md` #1 (build verified before push), #2/#5 (branch only, no secrets), #10 (this entry) · `SCOTTY_PATTERNS.md` Patterns 001 and 006 — 001 now confirmed stale on the `functions` location, 006 now confirmed to have patched only the depth-1 symptom · `CREW-ORDER-010` §3 and milestones 1–2.
 
-**Next:** (1) Path A preview test — remove/narrow the `functions` glob on a probe branch, verify BOTH the runtime resolves AND the API routes still exist, then whether depth-2 routes. (2) If Path A fails, Path B with the corrected 14-function math and a consolidation plan. (3) Live-test all six affected routes. (4) Smoke-test script.
+### 2026-09-12 — CREW-ORDER-010 CLOSED: Path A refuted on preview, Path B shipped and live-verified on production
+
+**Path A — tested on Preview and REFUTED.** Two variants: A1 kept the glob and replaced the runtime pin with `memory: 1024`; A2 removed the `functions` glob entirely. Both deployed Ready; both left depth-2 at Vercel's platform 404 while depth-1 and the nested non-catch-all control kept working. So **the glob is not the cause**, and **the runtime pin is not required at all** (Pattern 001's constraint is obsolete under Vercel CLI 59.1.3). The API-detection risk I flagged did not materialise — the API is auto-detected without the glob. **No config change was made:** main's `vercel.json` is untouched and all probe work stayed on branches.
+
+**Path B — implemented with the Captain-approved design, which solved the function-limit problem the order's math didn't fit.**
+- The order assumed 8 functions (→13). Actual count was **9**, so the outright conversion would be **14 — two over** the Hobby limit, not one. Flagged rather than decided; Captain approved a lower-risk layout instead of a consolidation or a plan upgrade.
+- `api/steward/[op]/[cellId].ts` serves all four steward ops from **one** dynamic file instead of four, plus `api/admin/members/[userId]/cell.ts` and `role.ts`. **11 functions total** — no consolidation, no plan upgrade.
+- `api/steward/[...path].ts` deleted; `api/admin/[...path].ts` trimmed to its five single-segment routes.
+- Logic ported **verbatim**; `setMemberRole`'s strict positive allowlist preserved exactly.
+- **The `withRLSContext`/`node`-vs-`tx` defect was deliberately NOT touched here.** CREW-ORDER-011 fixes it as one coordinated pass across every call site, to avoid a window in which some routes are fixed and others silently are not (011 §4.1).
+
+**Verification — Preview first, then production, as §5 required.** Merge commit `760fb60`.
+- Preview `resilientsa-gvf3w9o5u-…`: the six routes returned **401 unauthenticated and 403 authenticated** — the 403 proves the *handler executes and the role gate works*, not merely that a route matched.
+- Production after merge: all six → **401** `{"error":"Unauthorized"}`. No regression: `/api/admin/nodes|cells|members` and `/api/me` 401, `/api/auth/request-code` 405 (handler method check), `trade-completions/…/confirm-fairness` 401.
+
+**§5's standing check — [`scripts/smoke-routes.ts`](resilientsa-app/scripts/smoke-routes.ts).** Hits every declared route live and fails on a non-JSON body. The discriminator is the whole point: a routed handler always returns JSON, so requiring JSON catches **both** Vercel's platform 404 page *and* the SPA rewrite answering a bad path with HTML at 200. **The second case was found by my own negative control** — my first version tested only for status 404, and against a deliberately-bad base URL it reported 15/15 success on 200 HTML. Fixed; the control now correctly reports 0/15 and exits 1. Production: **15/15, exit 0.**
+
+**Two routing rules for this deployment, now documented and encoded in the script:**
+1. `[...path]` catch-alls match exactly **one** path segment. Never nest a route 2+ segments under a catch-all — use a real nested file.
+2. Catch-alls do **not** match depth 0. Bare `/api/listings` is legitimately a platform 404; the real routes are `/api/listings/<x>`.
+
+**§1 — the `b3b68c0` record, corrected plainly (milestone 7):**
+
+> **Commit `b3b68c0` (2026-09-11) fixed a real bug, but its causal claim was wrong.** It fixed `StewardDashboard.tsx` calling a demo-only sentinel `cellId` even in the non-demo path, and its message asserted this explained why *"every real user hitting /steward got a 404."* It did not. `/api/steward/dashboard/<anyCellId>` returned Vercel's **platform** 404 regardless of which id was sent, because the catch-all never matched a 2-segment path at all. Both defects produced the same visible symptom, so the sentinel fix was **necessary but never sufficient — the steward dashboard stayed broken until `760fb60`.** Anyone who tested `/steward` between those two commits and still saw a 404 would have wrongly concluded that `b3b68c0` had failed. The dashboard's API is only reachable as of today.
+
+**Milestones:** 1 ✅ · 2 ✅ · 3 ✅ (Path A preview-verified both ways before any merge — and correctly *not* merged, since it didn't work) · 4 ✅ (count confirmed 11 ≤ 12 before files were added; no consolidation needed) · 5 ✅ (six routes live-tested on production) · 6 ✅ (no regression) · 7 ✅ (above) · 8 flagged below · 9 this entry.
+
+**Flagged:**
+- **Bones (milestone 8):** ORDER 007's dashboard and ORDER 009a's member-assignment / steward-promotion UI can only be given a live verdict **now**. Both prior verdicts had a **non-functional API underneath them** and should be read with that in mind. `NodeAdmin.tsx`'s member picker and "Make Cell Steward" action have never been able to work; they need a live pass now that they can.
+- **Spock / Scotty:** `SCOTTY_PATTERNS.md` **Pattern 001 is stale in two ways** — the runtime pin is not required (verified on preview), and its "Do NOT put `functions` config in root `vercel.json`" guidance is inverted from the current arrangement (root holds it, the app-level file has none). Flagged rather than editing Scotty's pattern library.
+- **Also noted, not fixed:** `api/tsconfig.json` emits **TS5107** (`moduleResolution=node10` deprecated, breaks in TypeScript 7.0) — pre-existing and unrelated, but it will bite. And there is **no `log-offline-trade` route in the `api/` layer at all** (grep clean) — ORDER 007 §6.2 listed five routes but only four are deployed. That is a missing-feature gap, separate from this defect.
+
+**Protocol/pattern checked against:** `AGENTS.md` #1 (build + api typecheck before every push), #3 (no schema change), #4 (no dependency added — Playwright lives in `/tmp`, smoke test uses existing `tsx`), #5 (no secrets; PII/OTP/token leak-checked with `git grep --cached`) · `SCOTTY_PATTERNS.md` 001 and 006 · `CREW-ORDER-010` §3, §4, §5, §7.
+
+**Next:** (1) CREW-ORDER-011 §4.1 tx-threading fix + §4.3 RLS-exercising test — §4.2 owner-bypass goes to Spock (schema/connection role, Rule #3), flag not implement. (2) Bones live pass on the now-reachable `/steward` and `/admin`.
 
 ---
 

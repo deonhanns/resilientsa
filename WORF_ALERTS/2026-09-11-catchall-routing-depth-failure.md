@@ -182,5 +182,51 @@ So the mechnanism is still not identified at root, but the **symptom is fully ch
 
 ---
 
+## §5 UPDATE — 2026-09-12: Path B implemented, merged, and **VERIFIED LIVE ON PRODUCTION**. RESOLVED.
+
+### The fix
+
+| | |
+|---|---|
+| `api/steward/[...path].ts` | **deleted** — replaced by `api/steward/[op]/[cellId].ts`, one dynamic file serving all four steward ops instead of four files |
+| `api/admin/members/[userId]/cell.ts` | **new** — PATCH member-to-cell assignment (ORDER 009a milestone 4) |
+| `api/admin/members/[userId]/role.ts` | **new** — PATCH Cell Steward promotion/demotion (ORDER 009a milestone 5) |
+| `api/admin/[...path].ts` | trimmed to its five single-segment routes; the two member sub-routes removed |
+| **Function count** | **11** — under the Hobby limit of 12. The design avoids the two consolidations (or plan upgrade) the outright conversion would have forced. |
+| `vercel.json` | **untouched** — Path A was refuted, so no config change was needed |
+
+Logic ported verbatim; no behavioural change. `setMemberRole`'s positive allowlist (`cell_steward`/`member` only) preserved exactly. The `withRLSContext`/`node`-vs-`tx` defect was deliberately **left alone** here — CREW-ORDER-011 fixes it as one coordinated pass, to avoid a window in which some routes are fixed and others silently are not.
+
+Merge commit `760fb60`, on top of `b6f9ca7`.
+
+### Verification — Preview first, then production
+
+Merge required preview confirmation, which §5 specified. Preview `resilientsa-gvf3w9o5u-…`: all six routes returned 401 unauthenticated and **403 authenticated** (proving the handler executes and the role gates still work, not merely that a route matched).
+
+Production, post-merge, live:
+
+| Route | Result |
+|---|---|
+| `GET /api/steward/dashboard/<cellId>` | **401** `{"error":"Unauthorized"}` — routed ✅ |
+| `GET /api/steward/isolates/<cellId>` | **401** ✅ |
+| `GET /api/steward/hubs/<cellId>` | **401** ✅ |
+| `GET /api/steward/network-summary/<cellId>` | **401** ✅ |
+| `PATCH /api/admin/members/<id>/cell` | **401** ✅ |
+| `PATCH /api/admin/members/<id>/role` | **401** ✅ |
+
+No regression on any previously-working route — `/api/admin/nodes`, `/api/admin/members`, `/api/admin/cells`, `/api/me` all 401; `/api/auth/request-code` 405 (handler method check); `POST /api/trade-completions/.../confirm-fairness` 401.
+
+### Standing check added
+
+[`resilientsa-app/scripts/smoke-routes.ts`](resilientsa-app/scripts/smoke-routes.ts) — hits every declared route and fails on a platform 404. The discriminator is deliberately **not** the status code: a routed handler always returns JSON (its own 404 is `{"error":"Not found"}`) while Vercel's platform 404 returns an HTML page. `npx tsx scripts/smoke-routes.ts [baseUrl]`, exits non-zero on failure. Needs no credentials, so it stays runnable by anyone.
+
+### Root cause — honestly stated
+
+The **mechanism is fixed and the fix is proven**, but the underlying *why* is still not identified: Path A eliminated the `functions` glob and the runtime pin as causes (two preview variants, both negative), so neither config explains it. What is established is the operational rule: **this deployment's `[...path]` catch-alls match exactly one path segment, so no route may nest 2+ segments under a catch-all — use a real nested file.** That rule is now enforced by the smoke test rather than by memory.
+
+**Status: RESOLVED** for the routing defect. Open follow-ups carried separately: the `b3b68c0` record correction, the Pattern 001 correction (runtime pin obsolete), and Bones' re-review of the now-reachable steward and admin surfaces.
+
+---
+
 **O'Brien**
-*Live verification, 2026-09-11, Captain-directed. Not a Worf sign-off — Worf has not reviewed this document.*
+*Live verification, 2026-09-11 → 2026-09-12, Captain-directed. Not a Worf sign-off — Worf has not reviewed this document.*
