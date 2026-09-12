@@ -303,8 +303,31 @@ This is the same defect family as `SCOTTY_PATTERNS.md` Pattern 007 — a failure
 **BN-LIVE-04 — the design system has one ochre doing two jobs. (Low, but the root cause of the above)**
 [`src/styles/index.css:43`](resilientsa-app/src/styles/index.css:43) defines `--color-signal-urgent: #C85A3C` while [`src/styles/colors.css:23`](resilientsa-app/src/styles/colors.css:23) defines `--ochre: #C85A3C /* Ochre Earth */`. **The same hex is simultaneously "the warm ochre" and "the urgent signal."** The 2026-09-10 brief's distinction between acceptable ochre (`#E6A854`) and the anti-pattern therefore rests entirely on *which of two ochres* was meant, and a reader of the code cannot tell. Recommend separating the urgent signal from Ochre Earth so this class of confusion stops recurring. Same family: [`StewardDashboard.tsx:21`](resilientsa-app/src/components/steward-dashboard/StewardDashboard.tsx:21) uses `#C85A3C` as the `declining` trend colour — the same value as the error text at [`:217`](resilientsa-app/src/components/steward-dashboard/StewardDashboard.tsx:217).
 
-**BN-LIVE-05 — demo-mode only, recorded so it is not mistaken for a bug. (Low)**
-`/steward?demo` issues two failing calls: `404 /api/steward/hubs/c0000000-…-000000000000` and `404 /api/steward/isolates/c0000000-…-000000000000`. Expected: demo mode sets the all-zeros sentinel cellId and that cell does not exist server-side. **Not** a recurrence of the `b3b68c0` sentinel bug — [`StewardDashboard.tsx:263`](resilientsa-app/src/components/steward-dashboard/StewardDashboard.tsx:263)–`265` passes the real `cellId` to `IsolateList`/`HubList`/`LogOfflineTrade`, and the sentinel now appears only inside the `demo` branch at [`:176`](resilientsa-app/src/components/steward-dashboard/StewardDashboard.tsx:176).
+**BN-LIVE-05 — CORRECTED 2026-09-11. My first reading of this was wrong. (was Low → now folds into BN-LIVE-06, Critical)**
+`/steward?demo` issued `404 /api/steward/hubs/c0000000-…` and `404 /api/steward/isolates/c0000000-…`. I initially recorded these as expected — "demo mode uses the sentinel cellId and that cell doesn't exist server-side." **That was incorrect.** They were not a data 404; they were Vercel's *platform* 404, and the same response is returned for **any** cellId, including real ones, in any deployment. I found this by following the 404s instead of explaining them away. See BN-LIVE-06.
+
+**BN-LIVE-06 — the steward and admin APIs are unreachable in production. (CRITICAL — blocks ORDER 007 and two ORDER 009a milestones)**
+Live matrix against production: **catch-all `api/*/[...path].ts` functions only match ONE path segment.** Anything deeper never reaches the function and returns Vercel's platform 404 page.
+
+| Route | Result |
+|---|---|
+| `GET /api/steward/dashboard/<cellId>` | **platform 404** — never routed |
+| `GET /api/steward/network-summary/<cellId>` | **platform 404** |
+| `GET /api/steward/isolates/<cellId>` | **platform 404** |
+| `GET /api/admin/members/<userId>/cell` | **platform 404** |
+| `PATCH /api/admin/members/<userId>/role` | **platform 404** |
+| `POST /api/trade-completions/<id>/confirm-fairness` | **401 — routes fine** (a *static nested file*, not a catch-all) |
+| `GET /api/admin/nodes` (1 segment) | 401/200 — routes fine |
+
+The `trade-completions` row is the diagnostic: it is deeper *and* works, because it is a real nested file rather than a catch-all. So the defect is the catch-all mechanism itself — consistent with `SCOTTY_PATTERNS.md` Pattern 006, which already found that this project's explicit `functions` glob bypasses Vercel's bracket-syntax parsing. Pattern 006 fixed the catch-all's *parameter name*; this is the same cause producing a second symptom, *routing depth*, which that fix could not have addressed.
+
+Consequences for this verdict:
+- **ORDER 007's dashboard has never rendered live data.** Its whole API is unreachable. The 2026-09-10 "five fixes" — including building `network-summary` — are code-true but **runtime-unreachable**, so they can never have executed in production. My 2026-09-10 recommendation to re-verify visually was right for a deeper reason than I knew.
+- **This also corrects `b3b68c0`'s claim.** That commit fixed a real sentinel-cellId bug and asserted it explained every real user's `/steward` 404. It did not: `/api/steward/dashboard/<anyId>` 404s regardless. Both bugs produce the same symptom, so the sentinel fix was necessary but never sufficient — **the dashboard is still broken.**
+- **ORDER 009a milestones 4 and 5 are unachievable.** Member-to-cell assignment and Cell Steward promotion cannot be exercised by anyone from any client. The "Make Cell Steward" UI will silently fail.
+- The role-gate message I confirmed rendering (BN-LIVE-02) is therefore the *only* branch of `/admin` a user will ever see, because every data call 404s.
+
+Full detail, evidence matrix and recommended fix: [`WORF_ALERTS/2026-09-11-catchall-routing-depth-failure.md`](WORF_ALERTS/2026-09-11-catchall-routing-depth-failure.md:1). **Bones' design judgement is unchanged by this** — it is an engineering failure, logged here because it invalidates the runtime basis of three verdicts.
 
 ### ORDER 008 (Community Marketplace) — NOT REVIEWED in this pass
 `/support` was not visited with data. The 2026-09-10 CONDITIONAL PASS stands unchanged and still needs a live look.

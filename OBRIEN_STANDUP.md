@@ -1134,7 +1134,60 @@ Omitting devDependencies changes *nothing*. So none of this is vite/esbuild buil
 - **Bones — three orders now owe a live verdict**, not two: 007, 008 and 009a. All three are currently source-level only. `NodeAdmin.tsx` has no prototype to check against at all.
 - **Captain — two decisions needed before ORDER 009 can reach real people:** the POPIA ruling on unsolicited invites, and AT sender-ID registration (long lead time — worth starting now, in parallel).
 
-**Next:** (1) Spock / Captain: review and approve (or amend) CREW-ORDER-009. (2) Spock: Crew Order for CRIT-001. (3) Live Bones pass once screenshots can be relayed. (4) Captain: POPIA ruling and AT sender-ID registration in parallel.
+### 2026-09-11 (cont. 3) — LIVE verification session: real login, adversarial probes, and a Critical routing defect
+
+**Context:** Captain directed use of Playwright + a real authenticated session. Both MCP tools (`playwright`, `sequential-thinking`) are **not exposed to my tool set** despite being toggled on in Zoo Code — no MCP entries exist in `kilo.jsonc`, `.roomodes`, `.kilo/agent-manager.json` or `.kilocode/modes.json`. I used the **Playwright CLI** instead (`playwright@1.63.0` installed to `/tmp`, not the repo — no `package.json`/lockfile change, Rule #4 intact), which drives the same engine.
+
+**Capability established, not assumed:**
+- Vercel CLI is authenticated as `deonhanns` with the project linked, and **`OTP_DEBUG_LOG` is set for Preview *and* Production** → runtime logs are readable from this sandbox. Confirmed live: `[OTP_DEBUG] code for … (AT send failed: AT_API_KEY/AT_USERNAME not configured)` — which also **live-confirms Pattern 003 and the AT fallback**.
+- `AT_API_KEY`/`AT_USERNAME` are genuinely **absent** from the project's env vars.
+- **I cannot view images.** Reading a captured PNG returned *"Image file detected but current model does not support images."* So I captured screenshots for the Captain (`/tmp/resa-shots/{steward,admin}-demo.png`) but a **human visual pass is not mine to make**, and I have not claimed one.
+
+**Landed in commit `ac832b3` — first verdict grounded in the rendered DOM, not source comparison.** Drove production in headless Chromium at 390×844 and read live text + **computed CSS**:
+- ORDER 007: **NEEDS REVISION → CONDITIONAL PASS.** Both 2026-09-10 hard FAILs confirmed fixed live — NeedsRadar renders no count in text (exposed only via `title`/`aria-label`, verified on the Safety circle), and ochre `#E6A854` is computed on 19 elements with no rust on any isolate element.
+- ORDER 009a: **NEEDS REVISION.** BN-LIVE-01 `/admin` is unreachable by navigation (rendered nav is only `/trade`, `/support`, `/steward` — an admin has no in-app path to the console built for them). BN-LIVE-02 the role gate cannot distinguish "not authorised" from "request failed".
+
+**Then the live probes found something far worse — and it corrects my own earlier work.**
+
+**CRITICAL — catch-all routes only match ONE path segment.** Live matrix against production:
+
+| Route | Result |
+|---|---|
+| `GET /api/admin/nodes` (1 segment) | 401/200 — **reaches handler** |
+| `GET /api/steward/dashboard/<cellId>` | **platform 404** — never routed |
+| `GET /api/steward/network-summary/<cellId>` | **platform 404** |
+| `GET /api/admin/members/<userId>/cell` · `/role` | **platform 404** |
+| `POST /api/trade-completions/<id>/confirm-fairness` | **401 — routes fine** (static nested file, not a catch-all) |
+
+That last row is the diagnostic: it is *deeper and works*, because it is a real nested file. So the defect is the catch-all mechanism itself — consistent with Pattern 006, which already found that this project's explicit `functions` glob bypasses Vercel's bracket parsing. Pattern 006 fixed the catch-all's *parameter name*; this is the same cause producing *routing depth*, which that fix could not have addressed.
+
+**Two corrections I have to make against my own record:**
+
+1. **`b3b68c0`'s causal claim is wrong.** That commit fixed a genuine sentinel-`cellId` bug and its message asserted it explained why *"every real user hitting /steward got a 404."* It does not: `/api/steward/dashboard/<anyCellId>` 404s regardless of which id is sent. Both bugs produce the same symptom, so the sentinel fix was **necessary but never sufficient — the steward dashboard is still broken today.** Logged in `BONES_VERDICT.md` as BN-LIVE-05 (corrected) and BN-LIVE-06.
+2. **My BN-LIVE-05 first reading was wrong.** I wrote the demo-mode `hubs`/`isolates` 404s off as "expected — the sentinel cell doesn't exist server-side." They were the platform 404. I only found it by following the 404s instead of explaining them away. Recording the mistake because the record is worth more than the appearance of having been right first time.
+
+**Adversarial probe results — what passed, live:**
+- **Test 3 PASSES.** `POST /api/admin/nodes` with an already-admin target → **HTTP 409** `{"error":"This user already holds an administrative role elsewhere"}`, and the node list was **byte-identical before/after** (`diff` clean) — a genuine no-op, no partial write.
+- Unauthenticated, forged-token and **`demo-token`** requests → **401 on every reachable admin route**. The demo-token result matters: [`src/lib/session.ts:33`](resilientsa-app/src/lib/session.ts:33) stores the literal string `'demo-token'` client-side, so an API that accepted it would have been an open door. It does not.
+- Role gates confirmed live: as `regional_steward`, `GET /api/admin/nodes` → 200, while `/api/admin/cells` and `/api/admin/members` → 403.
+- **Tests 1 and 2 could NOT be verified:** cross-node cell assignment and `setMemberRole`'s privileged-role allowlist are `node_admin`-gated (no account holds it) *and* unroutable. They **fail closed**, so this is not an exposure — but they remain **source-verified only and must not be recorded as live-verified.**
+
+Full record: [`WORF_ALERTS/2026-09-11-catchall-routing-depth-failure.md`](WORF_ALERTS/2026-09-11-catchall-routing-depth-failure.md:1).
+
+**Session hygiene (Rule #5 / #2):** the test account's phone number, the OTP, and the session token were used only in shell variables and never written to any file. Temp files holding them were deleted, and `git grep --cached` for all three values returns **clean** across everything committed. **One disclosure to flag:** my redaction regex used `token|sessionToken` and missed the actual field name `session_token`, so the session token was printed in plaintext once in this session's output. It is the Captain's own 30-day test credential; treat it as burned and re-issue by logging in again when convenient.
+
+**Protocol/pattern checked against:**
+- `AGENTS.md` Critical Rules #1 (build verified before push), #2/#5 (no secrets — leak-checked, nothing committed), #4 (no dependency added to the project; Playwright installed under `/tmp` only), #10 (this entry)
+- `SCOTTY_PATTERNS.md` Patterns 001, 003, 005, 006 — Pattern 006 is now implicated as the *root cause* of this defect, not just its earlier symptom
+- `BONES_VERDICT.md` — corrected BN-LIVE-05, added BN-LIVE-06
+
+**Anything flagged to Worf or Bones:**
+- **Captain — Critical, escalated immediately.** The catch-all routing defect blocks ORDER 007's entire dashboard API and two of ORDER 009a's eleven milestones, and it invalidates the runtime basis of three existing verdicts. It needs a Crew Order (Spock) — converting the affected routes to explicit nested files is the proven-to-route fix, with `trade-completions/[match_id]/confirm-fairness.ts` as the working precedent. **Nothing was changed on the strength of it.**
+- **Worf — two open Criticals now**, and they compound: CRIT-001 (inert RLS) means no database backstop, while this defect means the API surface above it is partly non-functional.
+- **Bones — the design verdicts stand, but their runtime basis does not.** ORDER 007's "fixes verified" cannot have executed in production. `NodeAdmin.tsx`'s member-assignment and "Make Cell Steward" UI will silently fail for every user.
+- **A standing gap worth fixing:** nothing in the current process — build, typecheck, source review, milestone tables — can detect a route that 404s in production. A live route smoke test in `scripts/` would have caught this. Recommend it as a standing check.
+
+**Next:** (1) Captain/Spock: Crew Order for the catch-all routing defect — highest priority. (2) Spock: Crew Order for CRIT-001. (3) Human visual pass on the two screenshots; then the authenticated pass and both NodeAdmin consoles once routing is fixed. (4) Captain: review/approve ORDER 009; POPIA ruling; AT sender-ID registration.
 
 ---
 
