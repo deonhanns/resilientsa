@@ -1251,7 +1251,46 @@ Full record: [`WORF_ALERTS/2026-09-11-catchall-routing-depth-failure.md`](WORF_A
 
 **Protocol/pattern checked against:** `AGENTS.md` #1 (build + api typecheck before every push), #3 (no schema change), #4 (no dependency added — Playwright lives in `/tmp`, smoke test uses existing `tsx`), #5 (no secrets; PII/OTP/token leak-checked with `git grep --cached`) · `SCOTTY_PATTERNS.md` 001 and 006 · `CREW-ORDER-010` §3, §4, §5, §7.
 
-**Next:** (1) CREW-ORDER-011 §4.1 tx-threading fix + §4.3 RLS-exercising test — §4.2 owner-bypass goes to Spock (schema/connection role, Rule #3), flag not implement. (2) Bones live pass on the now-reachable `/steward` and `/admin`.
+### 2026-09-13 — CREW-ORDER-011: §3 confirmed (mechanism corrected), §4.1 complete, §4.3 test added, §5 checklist corrected
+
+**§3 — confirmed live, and the mechanism is NOT what §3 assumed.**
+Authorised temp endpoint, deployed to a **Preview** branch (not production — an improvement on the §6.5 precedent), called once, deleted, branch removed. Returned `current_user = session_user = neondb_owner`, and `neondb_owner` owns every RLS-bearing table with `relforcerowsecurity = false`.
+
+Then §4.3's test refined it to the actual mechanism:
+
+```
+connection role : neondb_owner   (superuser=false, bypassrls=true)     <-- BYPASSRLS
+baseline: contextless count of users               = 10
+probe:    count of users under a NON-EXISTENT node = 10   -> all rows visible
+```
+
+**The role carries the `BYPASSRLS` attribute.** In PostgreSQL that bypasses every policy always — independent of ownership and **independent of `FORCE ROW LEVEL SECURITY`**, which overrides only the *owner* exemption.
+
+**This correction invalidates an option in §4.2.** The order offers "faster interim: `ALTER TABLE … FORCE ROW LEVEL SECURITY`". On this evidence **that cannot work** while connecting as `neondb_owner`. §4.2 option 1 — a dedicated non-owner role **without `BYPASSRLS`** — is not merely preferred, it is the **only** viable fix. FORCE RLS may still be worth adding for defence in depth but must not be recorded as closing this. Recommended assertion for whoever implements it: `SELECT rolbypassrls FROM pg_roles WHERE rolname = current_user` must return false. **§4.2 stays with Spock per Rule #3 — flagged, not implemented.**
+
+**§4.1 — COMPLETE. All 31 call sites across 9 files threaded, in one coordinated pass.** `withRLSContext` now passes `tx` into `fn`, and every closure queries that `tx`. Also threaded `countConnectionsInWindow()` — a helper called *from inside* the networkSummary closure that queried `db` directly; without it that route would have looked fixed while still running uncontexted.
+
+**Verified by grep, not by tsc** — and this matters: a zero-arg closure is still assignable to `(tx) => …` in TypeScript, so **the compiler stays silent on an unconverted site.** tsc was clean while marketplace still had all 8 sites unconverted. The grep is the real check, and it now reports zero remaining.
+
+**A false PASS I caught in my own test — recorded because it is the important lesson.** The first version of the §4.3 test pointed the context at a non-existent node and counted `coop_pii.founding_members`, got **0 rows, and reported PASS**. The table is **empty** (`rows = 0`), so zero rows proved nothing — it would have "verified" RLS on the strength of having no data to protect. Fixed: the test now probes `users` (10 rows, RLS-bearing via `node_isolation`) and exits **INCONCLUSIVE**, not PASS, when the probe table is empty. General lesson: **a deny-based test passes trivially against empty data.**
+
+**§5 — AGENTS.md POPIA checklist corrected.** The `coop_pii` RLS item now reads CANNOT BE TICKED / NOT CURRENTLY TRUE, with the live evidence, the `BYPASSRLS` cause, the note that §4.1 was necessary-but-not-sufficient, the inert window (**2026-07-02 → §4.2**), and a pointer to the alert §3.
+
+**A mistake I made and repaired — worth the crew knowing.** An apply_diff block I wrote was malformed (a stray separator line inside my own replacement text). It **deleted two lines from AGENTS.md** — including both RLS checklist items — while the tool still reported the file as "modified". I caught it on the next read and restored both lines with the §5 annotation. Lesson: **a malformed apply_diff can silently DELETE rather than fail**, so re-read after any multi-block edit and verify the before/after line content. I have now made that same slip twice; both were caught by reading the file back rather than trusting the success message.
+
+**Remaining uncontexted queries, deliberately left and flagged rather than silently expanded:**
+- `api/admin/[...path].ts` — `listNodes` and `createNode` query `db` **outside** any closure (5 refs). These are regional_steward / node_admin operations that are not node-scoped data; this is the LOW-006 item from my 009a review, unchanged.
+- `_lib/gifts-nudge.ts` — one `insert(notificationLog)`, called from `gifts-profile/me.ts` **outside** any closure.
+- `_lib/otp.ts`, `_lib/session.ts`, `auth/[...path].ts` — not node-scoped (OTP and session tokens), so no RLS context applies.
+- `_lib/grounder.ts` — every `getGrounderForUser()` call site is outside a closure, so no `tx` is available and none is appropriate; verified by reading all 5 call sites in marketplace.
+
+**Milestones:** 1 ✅ · 2 ✅ (grep confirms zero remaining) · **3 is §4.2 — Spock's, not started** · **4 BLOCKED on §4.2** — the RLS test currently **FAILS by design** (10/10 rows visible); it becomes the acceptance test for §4.2 · 5 ✅ · 6 ✅ (api typecheck clean apart from the pre-existing TS5107; build clean; smoke test 15/15) · 7 this entry.
+
+**Honest statement of what this order can and cannot achieve:** §4.1 is done and correct, but **it does not start enforcing anything on its own** — RLS remains inert until §4.2 replaces the connection identity. CREW-ORDER-011 **cannot be closed by me**; milestone 4 depends on a change that is explicitly Spock's. **No real community-member PII should enter `coop_pii` until `verify-rls.ts` passes.**
+
+**Protocol/pattern checked against:** `AGENTS.md` #1 (api typecheck + build + smoke test before every push), #2/#5 (no secrets — `.env.local` read only via dotenv at runtime, never printed, never staged; leak-checked with `git grep --cached`), #3 (no schema change — §4.2 explicitly not attempted), #4 (no dependency added) · `CREW-ORDER-011` §3, §4.1, §4.2, §4.3, §5 · `WORF_ALERTS/2026-09-11-order009a-role-escalation-review.md` §3 + §3 amendment.
+
+**Next:** (1) **Spock: §4.2** — dedicated non-owner role without `BYPASSRLS`; then `npx tsx scripts/verify-rls.ts` must pass. (2) Bones live pass on the now-reachable `/steward` and `/admin`. (3) `SCOTTY_PATTERNS.md` Pattern 001 correction (runtime pin obsolete; `functions` guidance inverted) still outstanding from 010.
 
 ---
 

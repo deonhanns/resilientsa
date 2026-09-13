@@ -85,7 +85,16 @@ are being modified. Review only — do not edit or build.
 [ ] Founding member PII (full_name, surname, id_number, address, email) stored as bytea
 [ ] FoundingMember table lives in coop_pii schema, not public
 [ ] RLS enabled on every table in both public and coop_pii schemas
-[ ] coop_pii access restricted to node_admin role only via RLS policy
+[ ] **⚠️ coop_pii access restricted to node_admin role only via RLS policy — CANNOT BE TICKED. NOT CURRENTLY TRUE.**
+      Verified live 2026-09-13 (`CREW-ORDER-011` §3): RLS is ENABLED on every table but **NOT ENFORCED**.
+      - the application connects as `neondb_owner`, which **owns** every RLS-bearing table;
+      - no table has `FORCE ROW LEVEL SECURITY`, so PostgreSQL exempts the owner from RLS.
+      The `withRLSContext` tx-threading fix (§4.1, complete 2026-09-13) was **necessary but not sufficient** —
+      fixing it alone does NOT start enforcing anything. §4.2 (a dedicated non-owner application role and/or
+      FORCE RLS) is required and is **Spock's**, per Rule #3.
+      **RLS has been inert since ORDER 003 on 2026-07-02.** Until §4.2 lands and is verified, the only
+      isolation control is application-level `nodeId` filtering inside the route handlers.
+      See `WORF_ALERTS/2026-09-11-order009a-role-escalation-review.md` §3.
 [ ] No console.log() or equivalent logs PII values
 [ ] API responses never return raw encrypted bytes to the client
 [ ] Founding member data purged on registration confirmation, not retained

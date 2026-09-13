@@ -275,5 +275,34 @@ This was the "second, independent reason" that CRIT-001 flagged as inferred-but-
 
 ---
 
+## §3 AMENDMENT — 2026-09-13: the mechanism is `BYPASSRLS`, NOT the owner exemption. **FORCE RLS will not fix it.**
+
+Running the §4.3 RLS-exercising test produced a more precise mechanism than the §3 update above stated, and it changes the required fix.
+
+```
+connection role : neondb_owner   (superuser=false, bypassrls=true)     <-- BYPASSRLS
+baseline: contextless count of users                = 10
+probe:    count of users under a NON-EXISTENT node  = 10   -> all rows visible
+```
+
+**The role carries the `BYPASSRLS` attribute.** In PostgreSQL a role with `BYPASSRLS` bypasses every RLS policy, always — regardless of ownership, and **regardless of `FORCE ROW LEVEL SECURITY`**. `FORCE` overrides only the *owner* exemption; it has no effect on `BYPASSRLS`. Neon grants `BYPASSRLS` to its `neondb_owner` role.
+
+### Why this correction matters — it invalidates an option
+
+The §3 text above attributed the bypass to table **ownership**, which made `ALTER TABLE … FORCE ROW LEVEL SECURITY` look like a valid faster interim fix. **It is not.** CREW-ORDER-011 §4.2 offers two options "in order of preference" and describes FORCE RLS as "a narrower fix" worth doing anyway. On this evidence:
+
+- **§4.2 option 1 (a dedicated non-owner application role without `BYPASSRLS`) is the only one that can work.** It is now not merely preferred but **required**.
+- **§4.2 option 2 (FORCE RLS alone) cannot close this**, because the connection's role bypasses RLS by attribute before any policy or FORCE flag is considered. It may still be worth adding for defence in depth, but it must not be recorded as a fix.
+
+**Recommendation for Spock:** create a dedicated non-owner role with only the grants the app needs and **no `BYPASSRLS`**, switch `DATABASE_URL` to it, and assert that with `SELECT rolbypassrls FROM pg_roles WHERE rolname = current_user` returning false. `neondb_owner` should remain the migration/owner identity only.
+
+### A false PASS this test produced, and the fix — recorded deliberately
+
+The first version of the §4.3 test pointed the context at a non-existent node and counted `coop_pii.founding_members`. It got **0 rows and reported PASS**. That was a **false pass**: the table is **empty** (`rows = 0`), so zero rows proved nothing about enforcement — it would have "verified" RLS on the strength of having no data to protect. The test now probes `users` (which holds 10 rows, is RLS-bearing via a `node_isolation` policy on `node_id`, and therefore returns a meaningful result), and it exits **INCONCLUSIVE** rather than PASS when the probe table is empty.
+
+Worth flagging as a general lesson: **a deny-based test passes trivially against empty data.** Any future RLS or permissions assertion needs a non-empty fixture or an explicit emptiness check.
+
+---
+
 **O'Brien**
-*Second-eyes review, Captain-directed 2026-09-11; §3 live confirmation added 2026-09-13. Not a Worf sign-off — Worf has not reviewed this document.*
+*Second-eyes review, Captain-directed 2026-09-11; §3 live confirmation and §3 amendment 2026-09-13. Not a Worf sign-off — Worf has not reviewed this document.*
