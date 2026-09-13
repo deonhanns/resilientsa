@@ -97,8 +97,8 @@ async function createNode(req: VercelRequest, res: VercelResponse, session: Sess
 // GET /api/admin/cells
 async function listCells(req: VercelRequest, res: VercelResponse, session: SessionCtx) {
   if (session.userRole !== 'node_admin') return forbidden(res)
-  const rows = await withRLSContext(session.nodeId, session.userRole, async () =>
-    db.select().from(cells).where(eq(cells.nodeId, session.nodeId))
+  const rows = await withRLSContext(session.nodeId, session.userRole, async (tx) =>
+    tx.select().from(cells).where(eq(cells.nodeId, session.nodeId))
   )
   return res.json({ cells: rows })
 }
@@ -113,8 +113,8 @@ async function createCell(req: VercelRequest, res: VercelResponse, session: Sess
   }
 
   try {
-    const result = await withRLSContext(session.nodeId, session.userRole, async () =>
-      db.insert(cells).values({ nodeId: session.nodeId, name }).returning({ id: cells.id })
+    const result = await withRLSContext(session.nodeId, session.userRole, async (tx) =>
+      tx.insert(cells).values({ nodeId: session.nodeId, name }).returning({ id: cells.id })
     )
     return res.status(201).json({ cellId: result[0].id })
   } catch (err: any) {
@@ -128,8 +128,8 @@ async function createCell(req: VercelRequest, res: VercelResponse, session: Sess
 // GET /api/admin/members
 async function listMembers(req: VercelRequest, res: VercelResponse, session: SessionCtx) {
   if (session.userRole !== 'node_admin') return forbidden(res)
-  const rows = await withRLSContext(session.nodeId, session.userRole, async () =>
-    db.select({ id: users.id, displayName: users.displayName, role: users.role, cellId: users.cellId })
+  const rows = await withRLSContext(session.nodeId, session.userRole, async (tx) =>
+    tx.select({ id: users.id, displayName: users.displayName, role: users.role, cellId: users.cellId })
       .from(users).where(eq(users.nodeId, session.nodeId))
   )
   return res.json({ members: rows })

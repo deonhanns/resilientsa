@@ -5,20 +5,18 @@
 // catch-all only matched ONE path segment — so this route returned Vercel's
 // platform 404 and was unreachable in production, meaning ORDER 009a milestone 5
 // (Cell Steward promotion/demotion) could not be exercised by anyone. See
-// WORF_ALERTS/2026-09-11-catchall-routing-depth-failure.md.
+// WORF_ALERTS/2026-09-11-order009a-role-escalation-review.md.
 //
-// Logic is ported verbatim, including the strict POSITIVE allowlist that this
-// route's second-eyes review verified in source: only 'cell_steward' and 'member'
-// are ever accepted, so node_admin / regional_steward / grounder cannot be granted
-// through here. That allowlist is preserved exactly — it is the most security-
-// sensitive line in ORDER 009a.
+// CREW-ORDER-011 §4.1: queries now run through the `tx` handed in by
+// withRLSContext rather than the module-level `db`.
 //
-// NOTE: the withRLSContext/node-vs-tx pattern is intentionally preserved as-is.
-// Fixed platform-wide in CREW-ORDER-011 as one coordinated pass, not here.
+// The strict POSITIVE allowlist below is preserved exactly — only 'cell_steward'
+// and 'member' are ever accepted, so node_admin / regional_steward / grounder
+// cannot be granted through this route. It is the most security-sensitive line in
+// ORDER 009a and must not be altered.
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSession, unauthorized, forbidden } from '../../../_lib/session'
 import { withRLSContext } from '../../../_lib/db-context'
-import { db } from '../../../_lib/db'
 import { users } from '../../../../src/db/schema/public/users'
 import { cells } from '../../../../src/db/schema/public/cells'
 import { eq, and } from 'drizzle-orm'
@@ -43,20 +41,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const result = await withRLSContext(ctx.nodeId, ctx.userRole, async () => {
-      const [targetUser] = await db.select({ id: users.id, nodeId: users.nodeId, cellId: users.cellId, role: users.role })
+    const result = await withRLSContext(ctx.nodeId, ctx.userRole, async (tx) => {
+      const [targetUser] = await tx.select({ id: users.id, nodeId: users.nodeId, cellId: users.cellId, role: users.role })
         .from(users).where(eq(users.id, targetUserId))
       if (!targetUser) return { error: 'No user found with that id', status: 404 as const }
       if (targetUser.nodeId !== ctx.nodeId) return { error: 'Forbidden', status: 403 as const }
 
-      await db.update(users).set({ role }).where(eq(users.id, targetUserId))
+      await tx.update(users).set({ role }).where(eq(users.id, targetUserId))
 
       if (role === 'cell_steward' && targetUser.cellId) {
-        await db.update(cells).set({ stewardUserId: targetUserId }).where(eq(cells.id, targetUser.cellId))
+        await tx.update(cells).set({ stewardUserId: targetUserId }).where(eq(cells.id, targetUser.cellId))
       }
       if (role === 'member') {
         // Demotion: clear stewardship of any cell this user was stewarding
-        await db.update(cells).set({ stewardUserId: null })
+        await tx.update(cells).set({ stewardUserId: null })
           .where(and(eq(cells.nodeId, ctx.nodeId), eq(cells.stewardUserId, targetUserId)))
       }
 

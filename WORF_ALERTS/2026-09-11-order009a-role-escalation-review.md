@@ -245,5 +245,35 @@ Stated so nobody over-reads the confidence level:
 
 That verdict is **conditional on CRIT-001 being accepted as a known, tracked gap in the meantime.** Real community-member onboarding should not begin until CRIT-001 is either fixed or the Captain formally accepts the compensating control (application-level `nodeId` filtering only, with no database backstop) in writing — because the moment real PII exists, the inert `coop_pii` policy stops being a theoretical gap.
 
+## §3 UPDATE — 2026-09-13: the owner-bypass is CONFIRMED LIVE (was inferred)
+
+CREW-ORDER-011 §3 required this to be confirmed rather than assumed. Confirmed on a Vercel **Preview** deployment (branch `probe/011-db-identity`, deployment `resilientsa-4surjy23e-…`) using a temporary, token-gated, single-operation endpoint that was deleted and its branch removed immediately after one call. **Production was never touched** — an improvement on the §6.5 precedent, which used a production endpoint.
+
+```json
+{"identity":[{"current_user":"neondb_owner","session_user":"neondb_owner",
+              "db_name":"neondb","pg_version":"PostgreSQL 16.15 ..."}],
+ "tables":[
+   {"relname":"cells",           "rls_enabled":true,"rls_forced":false,"owner_role":"neondb_owner"},
+   {"relname":"cooperatives",    "rls_enabled":true,"rls_forced":false,"owner_role":"neondb_owner"},
+   {"relname":"founding_members","rls_enabled":true,"rls_forced":false,"owner_role":"neondb_owner"},
+   {"relname":"listings",        "rls_enabled":true,"rls_forced":false,"owner_role":"neondb_owner"},
+   {"relname":"nodes",           "rls_enabled":true,"rls_forced":false,"owner_role":"neondb_owner"},
+   {"relname":"users",           "rls_enabled":true,"rls_forced":false,"owner_role":"neondb_owner"}]}
+```
+
+Token gate held: wrong or missing token → 404.
+
+### What this proves
+
+`current_user` is **`neondb_owner`**, and `neondb_owner` owns **every** RLS-bearing table — including `coop_pii.founding_members`. `relforcerowsecurity` is **false** everywhere. PostgreSQL exempts a table's owner from RLS unless FORCE ROW LEVEL SECURITY is set. **So RLS is bypassed for the application regardless of policy content, and regardless of whether the `tx` bug is fixed.**
+
+This was the "second, independent reason" that CRIT-001 flagged as inferred-but-unconfirmed. It is now **confirmed**, and it materially changes the picture on the fix: **fixing `withRLSContext` alone would still leave RLS unenforced**, because the connection identity bypasses it independently. Both fixes are required.
+
+**Implication for CREW-ORDER-011:** §4.1 (`tx` threading) remains necessary and worth doing — but **it cannot be validated as effective until §4.2 closes the owner-bypass too.** §4.2 is a schema/connection-role change and stays with Spock per Rule #3. Consequently, the §4.3 RLS-exercising test run *before* §4.2 **will still observe the cross-node read succeeding** — that is the expected result, and must not be read as §4.1 having failed.
+
+**Also worth recording:** `rls_enabled: true` on every table confirms the ORDER 003 migration did exactly what it claimed. **The defect was never in the migration.** It is in the connection identity, and in a `tx` that was set up and then not used.
+
+---
+
 **O'Brien**
-*Second-eyes review, Captain-directed 2026-09-11. Not a Worf sign-off — Worf has not reviewed this document.*
+*Second-eyes review, Captain-directed 2026-09-11; §3 live confirmation added 2026-09-13. Not a Worf sign-off — Worf has not reviewed this document.*

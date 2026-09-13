@@ -1,9 +1,12 @@
 // api/trade-completions/[match_id]/confirm-fairness.ts
 // Vercel serverless function — POST /api/trade-completions/:matchId/confirm-fairness
+//
+// CREW-ORDER-011 §4.1: every query now runs through the `tx` handed in by
+// withRLSContext instead of the module-level `db`, so the transaction-local
+// set_config() RLS variables actually apply to them. Logic unchanged.
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSession, unauthorized } from '../../_lib/session'
 import { withRLSContext } from '../../_lib/db-context'
-import { db } from '../../_lib/db'
 import { matches } from '../../../src/db/schema/public/matches'
 import { listings } from '../../../src/db/schema/public/listings'
 import { tradeCompletions } from '../../../src/db/schema/public/trade-completions'
@@ -18,43 +21,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const matchId = req.query.match_id as string
   if (!matchId) return res.status(400).json({ error: 'match_id required' })
 
-  const result = await withRLSContext(session.nodeId, session.userRole, async () => {
-    const [match] = await db.select().from(matches).where(eq(matches.id, matchId)).limit(1)
+  const result = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+    const [match] = await tx.select().from(matches).where(eq(matches.id, matchId)).limit(1)
     if (!match) return null
     if (match.status === 'completed') return { conflict: true, message: 'Trade already completed' }
 
-    let [completion] = await db.select().from(tradeCompletions)
+    let [completion] = await tx.select().from(tradeCompletions)
       .where(eq(tradeCompletions.matchId, matchId)).limit(1)
 
     if (!completion) {
-      ;[completion] = await db.insert(tradeCompletions).values({
+      ;[completion] = await tx.insert(tradeCompletions).values({
         matchId,
         fairnessConfirmedByEachParty: { [session.userId]: true },
       }).returning()
     } else {
       const confirmations = completion.fairnessConfirmedByEachParty as Record<string, boolean>
       confirmations[session.userId] = true
-      await db.update(tradeCompletions)
+      await tx.update(tradeCompletions)
         .set({ fairnessConfirmedByEachParty: confirmations })
         .where(eq(tradeCompletions.id, completion.id))
       completion = { ...completion, fairnessConfirmedByEachParty: confirmations }
     }
 
-    const matchListings = await db.select({ userId: listings.userId })
+    const matchListings = await tx.select({ userId: listings.userId })
       .from(listings).where(inArray(listings.id, match.listingIds))
     const allPartyIds = matchListings.map((l) => l.userId)
     const confirmations = completion.fairnessConfirmedByEachParty as Record<string, boolean>
     const allConfirmed = allPartyIds.every((uid) => confirmations[uid])
 
     if (allConfirmed) {
-      await db.update(matches).set({ status: 'completed' }).where(eq(matches.id, matchId))
-      await db.update(listings)
+      await tx.update(matches).set({ status: 'completed' }).where(eq(matches.id, matchId))
+      await tx.update(listings)
         .set({ status: 'completed', updatedAt: new Date() })
         .where(inArray(listings.id, match.listingIds))
 
       if (allPartyIds.length >= 2) {
         const [a, b] = allPartyIds
-        await db.insert(connectionEvents).values([
+        await tx.insert(connectionEvents).values([
           { nodeId: session.nodeId, userAId: a, userBId: b, eventType: 'trade_completed' },
           { nodeId: session.nodeId, userAId: b, userBId: a, eventType: 'trade_completed' },
         ])

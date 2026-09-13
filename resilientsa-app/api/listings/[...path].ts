@@ -6,10 +6,13 @@
 // Internal routing (path segments from req.query.path):
 //   (empty)  -> GET/POST /api/listings
 //   :id      -> PATCH/DELETE /api/listings/:id
+//
+// CREW-ORDER-011 §4.1: every query now runs through the `tx` handed in by
+// withRLSContext instead of the module-level `db`, so the transaction-local
+// set_config() RLS variables actually apply to them. Logic unchanged.
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSession, unauthorized } from '../_lib/session'
 import { withRLSContext } from '../_lib/db-context'
-import { db } from '../_lib/db'
 import { listings } from '../../src/db/schema/public/listings'
 import { users } from '../../src/db/schema/public/users'
 import { eq, and, desc, sql } from 'drizzle-orm'
@@ -31,7 +34,7 @@ async function listingsRoot(req: VercelRequest, res: VercelResponse, session: Se
   if (req.method === 'GET') {
     const { cell_id, pillar, type, status } = req.query
 
-    const rows = await withRLSContext(session.nodeId, session.userRole, async () => {
+    const rows = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
       const conditions = [eq(listings.nodeId, session.nodeId)]
       if (cell_id)  conditions.push(eq(listings.cellId, cell_id as string))
       if (status)   conditions.push(eq(listings.status, status as any))
@@ -39,7 +42,7 @@ async function listingsRoot(req: VercelRequest, res: VercelResponse, session: Se
       if (pillar && pillar !== 'all') {
         conditions.push(sql`${listings.pillarTags} @> ARRAY[${pillar as string}]`)
       }
-      return db.select().from(listings).where(and(...conditions)).orderBy(desc(listings.createdAt)).limit(100)
+      return tx.select().from(listings).where(and(...conditions)).orderBy(desc(listings.createdAt)).limit(100)
     })
 
     return res.json(rows)
@@ -51,16 +54,16 @@ async function listingsRoot(req: VercelRequest, res: VercelResponse, session: Se
       return res.status(400).json({ error: 'type, pillar_tags, and title are required' })
     }
 
-    const [user] = await withRLSContext(session.nodeId, session.userRole, () =>
-      db.select({ cellId: users.cellId }).from(users).where(eq(users.id, session.userId)).limit(1)
+    const [user] = await withRLSContext(session.nodeId, session.userRole, (tx) =>
+      tx.select({ cellId: users.cellId }).from(users).where(eq(users.id, session.userId)).limit(1)
     )
 
     if (!user?.cellId) {
       return res.status(400).json({ error: 'You must be assigned to a cell before posting a listing' })
     }
 
-    const [listing] = await withRLSContext(session.nodeId, session.userRole, () =>
-      db.insert(listings).values({
+    const [listing] = await withRLSContext(session.nodeId, session.userRole, (tx) =>
+      tx.insert(listings).values({
         nodeId:      session.nodeId,
         cellId:      user.cellId!,
         userId:      session.userId,
@@ -82,8 +85,8 @@ async function listingById(req: VercelRequest, res: VercelResponse, id: string, 
   if (req.method === 'PATCH') {
     const { title, description, status, expected_status } = req.body
 
-    const rows = await withRLSContext(session.nodeId, session.userRole, async () => {
-      const [existing] = await db
+    const rows = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+      const [existing] = await tx
         .select().from(listings)
         .where(and(eq(listings.id, id), eq(listings.userId, session.userId)))
         .limit(1)
@@ -93,7 +96,7 @@ async function listingById(req: VercelRequest, res: VercelResponse, id: string, 
         return { conflict: true, current: existing.status }
       }
 
-      return db.update(listings).set({
+      return tx.update(listings).set({
         ...(title ? { title } : {}),
         ...(description !== undefined ? { description } : {}),
         ...(status ? { status } : {}),
@@ -112,8 +115,8 @@ async function listingById(req: VercelRequest, res: VercelResponse, id: string, 
   }
 
   if (req.method === 'DELETE') {
-    const rows = await withRLSContext(session.nodeId, session.userRole, () =>
-      db.update(listings)
+    const rows = await withRLSContext(session.nodeId, session.userRole, (tx) =>
+      tx.update(listings)
         .set({ status: 'withdrawn', updatedAt: new Date() })
         .where(and(eq(listings.id, id), eq(listings.userId, session.userId)))
         .returning()

@@ -1,9 +1,12 @@
 // api/gifts-profile/me.ts
 // Vercel serverless function — GET/PUT /api/gifts-profile/me
+//
+// CREW-ORDER-011 §4.1: every query now runs through the `tx` handed in by
+// withRLSContext instead of the module-level `db`, so the transaction-local
+// set_config() RLS variables actually apply to them. Logic unchanged.
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSession, unauthorized } from '../_lib/session'
 import { withRLSContext } from '../_lib/db-context'
-import { db } from '../_lib/db'
 import { giftsProfiles } from '../../src/db/schema/public/gifts-profiles'
 import { eq } from 'drizzle-orm'
 import { fireComplementaryGiftsNudge } from '../_lib/gifts-nudge'
@@ -13,8 +16,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!session) return unauthorized(res)
 
   if (req.method === 'GET') {
-    const profile = await withRLSContext(session.nodeId, session.userRole, () =>
-      db.select().from(giftsProfiles).where(eq(giftsProfiles.userId, session.userId)).limit(1)
+    const profile = await withRLSContext(session.nodeId, session.userRole, (tx) =>
+      tx.select().from(giftsProfiles).where(eq(giftsProfiles.userId, session.userId)).limit(1)
     )
     return res.json(profile[0] ?? null)
   }
@@ -22,15 +25,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'PUT') {
     const { loves_to_do, naturally_good_at, cares_about, free_text_gifts } = req.body
 
-    const existing = await withRLSContext(session.nodeId, session.userRole, () =>
-      db.select().from(giftsProfiles).where(eq(giftsProfiles.userId, session.userId)).limit(1)
+    const existing = await withRLSContext(session.nodeId, session.userRole, (tx) =>
+      tx.select().from(giftsProfiles).where(eq(giftsProfiles.userId, session.userId)).limit(1)
     )
 
     let profile
 
     if (existing.length > 0) {
-      ;[profile] = await withRLSContext(session.nodeId, session.userRole, () =>
-        db
+      ;[profile] = await withRLSContext(session.nodeId, session.userRole, (tx) =>
+        tx
           .update(giftsProfiles)
           .set({
             lovesToDo:       loves_to_do,
@@ -43,8 +46,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .returning()
       )
     } else {
-      ;[profile] = await withRLSContext(session.nodeId, session.userRole, () =>
-        db
+      ;[profile] = await withRLSContext(session.nodeId, session.userRole, (tx) =>
+        tx
           .insert(giftsProfiles)
           .values({
             userId:          session.userId,

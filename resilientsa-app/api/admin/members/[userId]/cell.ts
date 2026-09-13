@@ -7,18 +7,14 @@
 // (member-to-cell assignment) could not be exercised by anyone. See
 // WORF_ALERTS/2026-09-11-catchall-routing-depth-failure.md.
 //
-// Logic is ported verbatim: same node_admin gate, same server-side cross-node
-// rejection, same "cell must belong to the caller's node" check, same 404-instead-
-// of-403 for a cross-node cell (no existence leak). No behavioural change.
-//
-// NOTE: the withRLSContext/node-vs-tx pattern is intentionally preserved as-is.
-// It is defective platform-wide and is fixed in CREW-ORDER-011 as one coordinated
-// pass across every call site — deliberately NOT here, to avoid a window in which
-// some routes are fixed and others silently are not (011 §4.1).
+// CREW-ORDER-011 §4.1: queries now run through the `tx` handed in by
+// withRLSContext instead of the module-level `db`, so the RLS context variables
+// actually apply to them. Logic otherwise unchanged: same node_admin gate, same
+// server-side cross-node rejection, same "cell must belong to the caller's node"
+// check, same 404-instead-of-403 for a cross-node cell (no existence leak).
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSession, unauthorized, forbidden } from '../../../_lib/session'
 import { withRLSContext } from '../../../_lib/db-context'
-import { db } from '../../../_lib/db'
 import { users } from '../../../../src/db/schema/public/users'
 import { cells } from '../../../../src/db/schema/public/cells'
 import { eq } from 'drizzle-orm'
@@ -43,19 +39,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const result = await withRLSContext(ctx.nodeId, ctx.userRole, async () => {
-      const [targetUser] = await db.select({ id: users.id, nodeId: users.nodeId })
+    const result = await withRLSContext(ctx.nodeId, ctx.userRole, async (tx) => {
+      const [targetUser] = await tx.select({ id: users.id, nodeId: users.nodeId })
         .from(users).where(eq(users.id, targetUserId))
       if (!targetUser) return { error: 'No user found with that id', status: 404 as const }
       if (targetUser.nodeId !== ctx.nodeId) return { error: 'Forbidden', status: 403 as const }
 
-      const [targetCell] = await db.select({ id: cells.id, nodeId: cells.nodeId })
+      const [targetCell] = await tx.select({ id: cells.id, nodeId: cells.nodeId })
         .from(cells).where(eq(cells.id, cellId))
       if (!targetCell || targetCell.nodeId !== ctx.nodeId) {
         return { error: 'No cell found in your node with that id', status: 404 as const }
       }
 
-      await db.update(users).set({ cellId }).where(eq(users.id, targetUserId))
+      await tx.update(users).set({ cellId }).where(eq(users.id, targetUserId))
       return { ok: true }
     })
 

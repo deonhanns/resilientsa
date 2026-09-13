@@ -6,21 +6,20 @@
 // Vercel's platform 404 and was unreachable in production. See
 // WORF_ALERTS/2026-09-11-catchall-routing-depth-failure.md.
 //
-// A genuinely nested file routes correctly at any depth (the working precedent is
-// api/trade-completions/[match_id]/confirm-fairness.ts). One dynamic `[op]` file
-// serves all four steward routes instead of four separate files — which keeps the
-// function count unchanged rather than pushing it over the Hobby limit.
+// CREW-ORDER-011 §4.1: every query now runs through the `tx` handed in by
+// withRLSContext rather than the module-level `db`, so the transaction-local
+// set_config() RLS variables actually apply to them. This includes
+// countConnectionsInWindow(), which is called from inside the networkSummary
+// closure and therefore has to accept and thread `tx` too — otherwise that route
+// would look fixed while still running uncontexted.
 //
 //   dashboard/:cellId        -> GET /api/steward/dashboard/:cellId
 //   isolates/:cellId         -> GET /api/steward/isolates/:cellId
 //   hubs/:cellId             -> GET /api/steward/hubs/:cellId
 //   network-summary/:cellId  -> GET /api/steward/network-summary/:cellId
-//
-// Logic is ported verbatim from the catch-all. No behavioural change.
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSession, unauthorized, forbidden } from '../../_lib/session'
-import { withRLSContext } from '../../_lib/db-context'
-import { db } from '../../_lib/db'
+import { withRLSContext, type RlsTx } from '../../_lib/db-context'
 import { users } from '../../../src/db/schema/public/users'
 import { cells } from '../../../src/db/schema/public/cells'
 import { giftsProfiles } from '../../../src/db/schema/public/gifts-profiles'
@@ -51,25 +50,25 @@ async function dashboard(req: VercelRequest, res: VercelResponse, cellId: string
   }
 
   try {
-    const result = await withRLSContext(session.nodeId, session.userRole, async () => {
-      const [cell] = await db
+    const result = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+      const [cell] = await tx
         .select({ id: cells.id, name: cells.name, stewardUserId: cells.stewardUserId })
         .from(cells).where(and(eq(cells.id, cellId), eq(cells.nodeId, session.nodeId)))
 
       if (!cell) return { error: 'Cell not found', status: 404 }
 
-      const memberRows = await db
+      const memberRows = await tx
         .select({ id: users.id, displayName: users.displayName, role: users.role })
         .from(users).where(and(eq(users.cellId!, cellId), eq(users.nodeId, session.nodeId)))
 
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
 
       const membersWithActivity = await Promise.all(memberRows.map(async (m) => {
-        const giftsProfile = await db
+        const giftsProfile = await tx
           .select({ lovesToDo: giftsProfiles.lovesToDo, caresDeeplyAbout: giftsProfiles.caresDeeplyAbout })
           .from(giftsProfiles).where(eq(giftsProfiles.userId, m.id)).limit(1)
 
-        const [connCount] = await db
+        const [connCount] = await tx
           .select({ count: count() }).from(connectionEvents)
           .where(and(
             eq(connectionEvents.nodeId, session.nodeId),
@@ -86,7 +85,7 @@ async function dashboard(req: VercelRequest, res: VercelResponse, cellId: string
 
       membersWithActivity.sort((a, b) => a.recentConnections - b.recentConnections)
 
-      const needsRadarRaw = await db
+      const needsRadarRaw = await tx
         .select({ pillarTag: sql<string>`unnest(${listings.pillarTags})` })
         .from(listings).where(and(
           eq(listings.nodeId, session.nodeId), eq(listings.cellId, cellId),
@@ -99,18 +98,18 @@ async function dashboard(req: VercelRequest, res: VercelResponse, cellId: string
       }
 
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-      const [newListingsCount] = await db.select({ count: count() }).from(listings)
+      const [newListingsCount] = await tx.select({ count: count() }).from(listings)
         .where(and(eq(listings.nodeId, session.nodeId), eq(listings.cellId, cellId), gte(listings.createdAt, sevenDaysAgo)))
-      const [completedTradesCount] = await db.select({ count: count() }).from(tradeCompletions)
+      const [completedTradesCount] = await tx.select({ count: count() }).from(tradeCompletions)
         .where(gte(tradeCompletions.completedAt, sevenDaysAgo))
-      const [newConnectionsCount] = await db.select({ count: count() }).from(connectionEvents)
+      const [newConnectionsCount] = await tx.select({ count: count() }).from(connectionEvents)
         .where(and(eq(connectionEvents.nodeId, session.nodeId), gte(connectionEvents.createdAt, sevenDaysAgo)))
 
       const reciprocityFlags: any[] = []
       for (const m of membersWithActivity) {
-        const [offeringCount] = await db.select({ count: count() }).from(listings)
+        const [offeringCount] = await tx.select({ count: count() }).from(listings)
           .where(and(eq(listings.userId, m.id), eq(listings.type, 'offer'), eq(listings.status, 'completed')))
-        const [needingCount] = await db.select({ count: count() }).from(listings)
+        const [needingCount] = await tx.select({ count: count() }).from(listings)
           .where(and(eq(listings.userId, m.id), eq(listings.type, 'need'), eq(listings.status, 'completed')))
 
         const giving = offeringCount?.count ?? 0
@@ -145,17 +144,17 @@ async function isolates(req: VercelRequest, res: VercelResponse, cellId: string,
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
 
-    const result = await withRLSContext(session.nodeId, session.userRole, async () => {
-      const cellMembers = await db
+    const result = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+      const cellMembers = await tx
         .select({ id: users.id, displayName: users.displayName })
         .from(users).where(and(eq(users.cellId!, cellId), eq(users.nodeId, session.nodeId)))
 
       const isolatesArr: any[] = []
       for (const m of cellMembers) {
-        const [connCount] = await db.select({ count: count() }).from(connectionEvents)
+        const [connCount] = await tx.select({ count: count() }).from(connectionEvents)
           .where(and(eq(connectionEvents.nodeId, session.nodeId), sql`(${connectionEvents.userAId} = ${m.id} OR ${connectionEvents.userBId} = ${m.id})`))
 
-        const [lastConn] = await db.select({ lastActive: connectionEvents.createdAt }).from(connectionEvents)
+        const [lastConn] = await tx.select({ lastActive: connectionEvents.createdAt }).from(connectionEvents)
           .where(and(eq(connectionEvents.nodeId, session.nodeId), sql`(${connectionEvents.userAId} = ${m.id} OR ${connectionEvents.userBId} = ${m.id})`))
           .orderBy(desc(connectionEvents.createdAt)).limit(1)
 
@@ -163,7 +162,7 @@ async function isolates(req: VercelRequest, res: VercelResponse, cellId: string,
         const hasRecent = lastConn?.lastActive != null && lastConn.lastActive >= thirtyDaysAgo
 
         if (connectionCount === 0 || !hasRecent) {
-          const giftsProfile = await db
+          const giftsProfile = await tx
             .select({ lovesToDo: giftsProfiles.lovesToDo, caresDeeplyAbout: giftsProfiles.caresDeeplyAbout })
             .from(giftsProfiles).where(eq(giftsProfiles.userId, m.id)).limit(1)
 
@@ -195,14 +194,14 @@ async function hubs(req: VercelRequest, res: VercelResponse, cellId: string, ses
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
 
-    const result = await withRLSContext(session.nodeId, session.userRole, async () => {
-      const cellMembers = await db
+    const result = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+      const cellMembers = await tx
         .select({ id: users.id, displayName: users.displayName, role: users.role })
         .from(users).where(and(eq(users.cellId!, cellId), eq(users.nodeId, session.nodeId)))
 
       const memberConnections: { id: string; displayName: string; role: string; connectionCount: number }[] = []
       for (const m of cellMembers) {
-        const [connCount] = await db.select({ count: count() }).from(connectionEvents)
+        const [connCount] = await tx.select({ count: count() }).from(connectionEvents)
           .where(and(eq(connectionEvents.nodeId, session.nodeId), gte(connectionEvents.createdAt, thirtyDaysAgo), sql`(${connectionEvents.userAId} = ${m.id} OR ${connectionEvents.userBId} = ${m.id})`))
         memberConnections.push({ id: m.id, displayName: m.displayName, role: m.role ?? 'member', connectionCount: connCount?.count ?? 0 })
       }
@@ -232,7 +231,12 @@ async function hubs(req: VercelRequest, res: VercelResponse, cellId: string, ses
 // [since, until). Deliberately follows the same per-member N+1 loop
 // pattern already established in dashboard()/isolates()/hubs() above,
 // rather than introducing a new query shape for this one route.
+//
+// Takes `tx` because it is only ever called from inside a withRLSContext
+// closure — querying the module-level `db` here would silently run outside the
+// transaction that holds the RLS context (CREW-ORDER-011 §4.1).
 async function countConnectionsInWindow(
+  tx: RlsTx,
   nodeId: string,
   memberIds: string[],
   since: Date,
@@ -246,7 +250,7 @@ async function countConnectionsInWindow(
       sql`(${connectionEvents.userAId} = ${id} OR ${connectionEvents.userBId} = ${id})`,
     ]
     if (until) conditions.push(sql`${connectionEvents.createdAt} < ${until}`)
-    const [c] = await db.select({ count: count() }).from(connectionEvents).where(and(...conditions))
+    const [c] = await tx.select({ count: count() }).from(connectionEvents).where(and(...conditions))
     total += c?.count ?? 0
   }
   return total
@@ -311,12 +315,12 @@ async function networkSummary(req: VercelRequest, res: VercelResponse, cellId: s
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-    const result = await withRLSContext(session.nodeId, session.userRole, async () => {
-      const [cell] = await db.select({ id: cells.id }).from(cells)
+    const result = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+      const [cell] = await tx.select({ id: cells.id }).from(cells)
         .where(and(eq(cells.id, cellId), eq(cells.nodeId, session.nodeId)))
       if (!cell) return { error: 'Cell not found', status: 404 as const }
 
-      const cellMembers = await db.select({ id: users.id }).from(users)
+      const cellMembers = await tx.select({ id: users.id }).from(users)
         .where(and(eq(users.cellId!, cellId), eq(users.nodeId, session.nodeId)))
       const memberIds = cellMembers.map((m) => m.id)
 
@@ -331,14 +335,14 @@ async function networkSummary(req: VercelRequest, res: VercelResponse, cellId: s
       // Per-member 30-day counts, for phase determination
       const memberConnCounts: number[] = []
       for (const id of memberIds) {
-        const c = await countConnectionsInWindow(session.nodeId, [id], thirtyDaysAgo)
+        const c = await countConnectionsInWindow(tx, session.nodeId, [id], thirtyDaysAgo)
         memberConnCounts.push(c)
       }
       const phase = determinePhase(memberConnCounts)
 
-      const currentPeriod = await countConnectionsInWindow(session.nodeId, memberIds, thirtyDaysAgo)
-      const previousPeriod = await countConnectionsInWindow(session.nodeId, memberIds, sixtyDaysAgo, thirtyDaysAgo)
-      const weekConnections = await countConnectionsInWindow(session.nodeId, memberIds, sevenDaysAgo)
+      const currentPeriod = await countConnectionsInWindow(tx, session.nodeId, memberIds, thirtyDaysAgo)
+      const previousPeriod = await countConnectionsInWindow(tx, session.nodeId, memberIds, sixtyDaysAgo, thirtyDaysAgo)
+      const weekConnections = await countConnectionsInWindow(tx, session.nodeId, memberIds, sevenDaysAgo)
 
       let trend: Trend = 'stable'
       if (previousPeriod === 0) {

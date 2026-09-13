@@ -11,11 +11,19 @@
 //   requests             -> GET grounder's incoming requests
 //   engagements/:id      -> PATCH accept/decline/active/complete (grounder)
 //   engagements/:id/endorse -> POST endorsement (node_admin)
+//
+// CREW-ORDER-011 §4.1: all 8 withRLSContext closures now run their queries
+// through the `tx` they are handed rather than the module-level `db`, so the
+// transaction-local set_config() RLS variables actually apply to them.
+//
+// `getGrounderForUser()` is deliberately NOT threaded: every call site is
+// OUTSIDE a withRLSContext closure (it resolves a grounder identity, which is not
+// node-scoped data), so it has no tx available and none is appropriate. Logic
+// otherwise unchanged.
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSession, unauthorized, forbidden } from '../_lib/session'
 import { withRLSContext } from '../_lib/db-context'
 import { getGrounderForUser } from '../_lib/grounder'
-import { db } from '../_lib/db'
 import { programmeOfferings } from '../../src/db/schema/public/programme-offerings'
 import { grounders } from '../../src/db/schema/public/grounders'
 import { offeringEndorsements } from '../../src/db/schema/public/offering-endorsements'
@@ -38,12 +46,16 @@ function segments(req: VercelRequest): Seg[] {
 // GET /api/marketplace/offerings?pillar=&search=
 // POST /api/marketplace/offerings
 // ---------------------------------------------------------------
-async function offeringsRoot(req: VercelRequest, res: VercelResponse, session: Awaited<ReturnType<typeof getSession>> & { userId: string; userRole: string; nodeId: string }) {
+// NOTE: param type matched to the other handlers in this file. It previously read
+// `Awaited<ReturnType<typeof getSession>> & {...}`, which required `cellId` that the
+// router's `ctx` does not carry — so the call at the bottom of the file did not
+// typecheck. Widened to the same shape the sibling functions use; behaviour identical.
+async function offeringsRoot(req: VercelRequest, res: VercelResponse, session: { userId: string; userRole: string; nodeId: string }) {
   // GET browse — community-facing, verified grounders only, active offerings
   if (req.method === 'GET') {
     const { pillar, search } = req.query
 
-    const rows = await withRLSContext(session.nodeId, session.userRole, async () => {
+    const rows = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
       const conditions = [
         eq(programmeOfferings.status, 'active'),
         eq(grounders.verificationStatus, 'verified'),
@@ -58,7 +70,7 @@ async function offeringsRoot(req: VercelRequest, res: VercelResponse, session: A
         )
       }
 
-      const offerings = await db
+      const offerings = await tx
         .select({
           id: programmeOfferings.id,
           name: programmeOfferings.name,
@@ -78,7 +90,7 @@ async function offeringsRoot(req: VercelRequest, res: VercelResponse, session: A
       const endorsementCounts: Record<string, { recommend: number; total: number }> = {}
 
       if (offeringIds.length > 0) {
-        const engagementEndorsements = await db
+        const engagementEndorsements = await tx
           .select({
             offeringId: sql<string>`oe.offering_id`,
             recommend: offeringEndorsements.recommend,
@@ -124,8 +136,8 @@ async function offeringsRoot(req: VercelRequest, res: VercelResponse, session: A
       return res.status(400).json({ error: 'name and pillarTags (array, min 1) are required' })
     }
 
-    const [offering] = await withRLSContext(session.nodeId, session.userRole, () =>
-      db.insert(programmeOfferings).values({
+    const [offering] = await withRLSContext(session.nodeId, session.userRole, (tx) =>
+      tx.insert(programmeOfferings).values({
         grounderId: grounder.id,
         name,
         shortDescription: shortDescription ?? null,
@@ -152,8 +164,8 @@ async function offeringsMine(req: VercelRequest, res: VercelResponse, session: {
   const grounder = await getGrounderForUser(session.userId)
   if (!grounder) return res.status(403).json({ error: 'Only Grounders can view their offerings.' })
 
-  const rows = await withRLSContext(session.nodeId, session.userRole, async () => {
-    return db
+  const rows = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+    return tx
       .select({
         id: programmeOfferings.id,
         name: programmeOfferings.name,
@@ -185,8 +197,8 @@ async function offeringsById(req: VercelRequest, res: VercelResponse, id: string
 
   const { name, shortDescription, fullDescription, pillarTags, communityRequirements, typicalDuration, status } = req.body
 
-  const rows = await withRLSContext(session.nodeId, session.userRole, async () => {
-    const [existing] = await db
+  const rows = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+    const [existing] = await tx
       .select()
       .from(programmeOfferings)
       .where(and(eq(programmeOfferings.id, id), eq(programmeOfferings.grounderId, grounder.id)))
@@ -194,7 +206,7 @@ async function offeringsById(req: VercelRequest, res: VercelResponse, id: string
 
     if (!existing) return null
 
-    return db.update(programmeOfferings).set({
+    return tx.update(programmeOfferings).set({
       ...(name !== undefined ? { name } : {}),
       ...(shortDescription !== undefined ? { shortDescription } : {}),
       ...(fullDescription !== undefined ? { fullDescription } : {}),
@@ -223,8 +235,8 @@ async function offeringsRequest(req: VercelRequest, res: VercelResponse, offerin
 
   const { requestContext } = req.body
 
-  const result = await withRLSContext(session.nodeId, session.userRole, async () => {
-    const [offering] = await db
+  const result = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+    const [offering] = await tx
       .select({ id: programmeOfferings.id, status: programmeOfferings.status })
       .from(programmeOfferings)
       .where(eq(programmeOfferings.id, offeringId))
@@ -233,7 +245,7 @@ async function offeringsRequest(req: VercelRequest, res: VercelResponse, offerin
     if (!offering) return { notFound: true }
     if (offering.status !== 'active') return { inactive: true }
 
-    const [existing] = await db
+    const [existing] = await tx
       .select({ id: offeringEngagements.id })
       .from(offeringEngagements)
       .where(
@@ -247,7 +259,7 @@ async function offeringsRequest(req: VercelRequest, res: VercelResponse, offerin
 
     if (existing) return { conflict: true }
 
-    const [engagement] = await db.insert(offeringEngagements).values({
+    const [engagement] = await tx.insert(offeringEngagements).values({
       offeringId,
       nodeId: session.nodeId,
       status: 'requested',
@@ -272,8 +284,8 @@ async function requestsRoot(req: VercelRequest, res: VercelResponse, session: { 
   const grounder = await getGrounderForUser(session.userId)
   if (!grounder) return res.status(403).json({ error: 'Only Grounders can view requests.' })
 
-  const rows = await withRLSContext(session.nodeId, session.userRole, async () => {
-    return db
+  const rows = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+    return tx
       .select({
         id: offeringEngagements.id,
         offeringId: offeringEngagements.offeringId,
@@ -323,8 +335,8 @@ async function engagementsById(req: VercelRequest, res: VercelResponse, engageme
     return res.status(400).json({ error: 'Valid status required: accepted, declined, active, completed' })
   }
 
-  const result = await withRLSContext(session.nodeId, session.userRole, async () => {
-    const [engagement] = await db
+  const result = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+    const [engagement] = await tx
       .select({
         id: offeringEngagements.id,
         status: offeringEngagements.status,
@@ -336,7 +348,7 @@ async function engagementsById(req: VercelRequest, res: VercelResponse, engageme
 
     if (!engagement) return { notFound: true }
 
-    const [offering] = await db
+    const [offering] = await tx
       .select({ grounderId: programmeOfferings.grounderId })
       .from(programmeOfferings)
       .where(eq(programmeOfferings.id, engagement.offeringId))
@@ -360,7 +372,7 @@ async function engagementsById(req: VercelRequest, res: VercelResponse, engageme
       updates.completedAt = new Date()
     }
 
-    return db.update(offeringEngagements)
+    return tx.update(offeringEngagements)
       .set(updates)
       .where(eq(offeringEngagements.id, engagementId))
       .returning()
@@ -393,8 +405,8 @@ async function engagementsEndorse(req: VercelRequest, res: VercelResponse, engag
     return res.status(400).json({ error: 'recommend (boolean) is required' })
   }
 
-  const result = await withRLSContext(session.nodeId, session.userRole, async () => {
-    const [engagement] = await db
+  const result = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+    const [engagement] = await tx
       .select({
         id: offeringEngagements.id,
         status: offeringEngagements.status,
@@ -410,7 +422,7 @@ async function engagementsEndorse(req: VercelRequest, res: VercelResponse, engag
       return { notCompleted: true, current: engagement.status }
     }
 
-    const [existing] = await db
+    const [existing] = await tx
       .select({ id: offeringEndorsements.id })
       .from(offeringEndorsements)
       .where(
@@ -423,7 +435,7 @@ async function engagementsEndorse(req: VercelRequest, res: VercelResponse, engag
 
     if (existing) return { conflict: true }
 
-    const [endorsement] = await db.insert(offeringEndorsements).values({
+    const [endorsement] = await tx.insert(offeringEndorsements).values({
       engagementId,
       nodeId: session.nodeId,
       recommend,

@@ -7,10 +7,13 @@
 //   (empty)        -> GET/POST /api/matches
 //   :id/confirm    -> PATCH /api/matches/:id/confirm
 //   :id/decline    -> PATCH /api/matches/:id/decline
+//
+// CREW-ORDER-011 §4.1: every query now runs through the `tx` handed in by
+// withRLSContext instead of the module-level `db`, so the transaction-local
+// set_config() RLS variables actually apply to them. Logic unchanged.
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSession, unauthorized, forbidden } from '../_lib/session'
 import { withRLSContext } from '../_lib/db-context'
-import { db } from '../_lib/db'
 import { matches } from '../../src/db/schema/public/matches'
 import { listings } from '../../src/db/schema/public/listings'
 import { eq, and, inArray, desc } from 'drizzle-orm'
@@ -31,10 +34,10 @@ function segments(req: VercelRequest): string[] {
 async function matchesRoot(req: VercelRequest, res: VercelResponse, session: SessionCtx) {
   if (req.method === 'GET') {
     const { user_id } = req.query
-    const rows = await withRLSContext(session.nodeId, session.userRole, async () => {
+    const rows = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
       const conditions = []
       if (user_id) conditions.push(eq(matches.facilitatedBySteward, user_id as string))
-      return db.select().from(matches)
+      return tx.select().from(matches)
         .where(conditions.length ? and(...conditions) : undefined)
         .orderBy(desc(matches.createdAt)).limit(50)
     })
@@ -51,8 +54,8 @@ async function matchesRoot(req: VercelRequest, res: VercelResponse, session: Ses
       return res.status(400).json({ error: 'listing_ids array with at least 2 IDs required' })
     }
 
-    const result = await withRLSContext(session.nodeId, session.userRole, async () => {
-      const existing = await db.select().from(listings)
+    const result = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+      const existing = await tx.select().from(listings)
         .where(and(inArray(listings.id, listing_ids), eq(listings.status, 'open')))
         .limit(listing_ids.length)
 
@@ -60,13 +63,13 @@ async function matchesRoot(req: VercelRequest, res: VercelResponse, session: Ses
         return { error: 'One or more listings are not open or do not exist' }
       }
 
-      const [match] = await db.insert(matches).values({
+      const [match] = await tx.insert(matches).values({
         listingIds: listing_ids,
         status: 'proposed',
         facilitatedBySteward: session.userId,
       }).returning()
 
-      await db.update(listings)
+      await tx.update(listings)
         .set({ status: 'matched', updatedAt: new Date() })
         .where(inArray(listings.id, listing_ids))
 
@@ -84,19 +87,19 @@ async function matchesRoot(req: VercelRequest, res: VercelResponse, session: Ses
 async function matchConfirm(req: VercelRequest, res: VercelResponse, matchId: string, session: SessionCtx) {
   if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' })
 
-  const result = await withRLSContext(session.nodeId, session.userRole, async () => {
-    const [match] = await db.select().from(matches).where(eq(matches.id, matchId)).limit(1)
+  const result = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+    const [match] = await tx.select().from(matches).where(eq(matches.id, matchId)).limit(1)
     if (!match) return null
     if (match.status !== 'proposed') return { conflict: true, current: match.status }
 
-    const matchListings = await db.select({ userId: listings.userId })
+    const matchListings = await tx.select({ userId: listings.userId })
       .from(listings).where(inArray(listings.id, match.listingIds))
 
     if (!matchListings.some((l) => l.userId === session.userId)) {
       return { forbidden: true }
     }
 
-    return db.update(matches).set({ status: 'confirmed' })
+    return tx.update(matches).set({ status: 'confirmed' })
       .where(eq(matches.id, matchId)).returning()
   })
 
@@ -110,15 +113,15 @@ async function matchConfirm(req: VercelRequest, res: VercelResponse, matchId: st
 async function matchDecline(req: VercelRequest, res: VercelResponse, matchId: string, session: SessionCtx) {
   if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' })
 
-  const result = await withRLSContext(session.nodeId, session.userRole, async () => {
-    const [match] = await db.select().from(matches).where(eq(matches.id, matchId)).limit(1)
+  const result = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+    const [match] = await tx.select().from(matches).where(eq(matches.id, matchId)).limit(1)
     if (!match) return null
 
-    await db.update(listings)
+    await tx.update(listings)
       .set({ status: 'open', updatedAt: new Date() })
       .where(inArray(listings.id, match.listingIds))
 
-    return db.update(matches).set({ status: 'declined' })
+    return tx.update(matches).set({ status: 'declined' })
       .where(eq(matches.id, matchId)).returning()
   })
 
