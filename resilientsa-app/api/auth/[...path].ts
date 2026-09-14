@@ -65,12 +65,24 @@ async function requestCode(req: VercelRequest, res: VercelResponse) {
 
     return res.json({ message: 'Code sent' })
   } catch (err: any) {
-    return res.status(500).json({
-      error: err.message || 'Unknown error',
-      stack: err.stack?.split('\n').slice(0, 3),
-      hasDbUrl: !!process.env.DATABASE_URL,
-      hasEncKey: !!process.env.ENCRYPTION_KEY,
-    })
+    // SECURITY — do NOT return err.message to the caller.
+    //
+    // Drizzle embeds both the full SQL statement AND its bound parameters in
+    // err.message. On THIS route one of those bound parameters is the plaintext
+    // OTP (see the insert into otp_codes in storeCode), so the previous handler
+    // handed a live, usable login code to any unauthenticated caller who could
+    // make the query fail. Confirmed live 2026-09-14 against a deployment whose
+    // database role made the insert fail — the response body contained
+    // `params: <phone_hash>,<6-digit-code>,<expiry>`. The stack trace and the
+    // hasDbUrl/hasEncKey booleans leaked internals the same way.
+    //
+    // The SQL prefix is still logged server-side for diagnosis (Vercel Runtime
+    // Logs), but the `params:` tail is stripped even from the log — for the same
+    // reason OTP_DEBUG_LOG is an explicit opt-in: an OTP in a log is a live
+    // credential (SCOTTY_PATTERNS.md Pattern 003).
+    const sqlOnly = String(err?.message ?? '').split('\nparams:')[0]
+    console.error(`[AUTH_500] request-code failed: ${err?.name ?? 'Error'} — ${sqlOnly}`)
+    return res.status(500).json({ error: 'Internal server error' })
   }
 }
 
