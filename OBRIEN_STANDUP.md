@@ -1340,6 +1340,61 @@ probe:    count of users under a NON-EXISTENT node = 10   -> all rows visible
 
 ---
 
+### 2026-09-18 — Preview re-verified healthy after the Captain's revert; CREW-ORDER-011 §4.2 redesign drafted (DRAFT, not in force)
+
+**Context:** Captain restored Preview's `POSTGRES_URL` to the `neondb_owner` connection string and redeployed. Ordered: confirm Preview is genuinely healthy with a real login, close the loose end here, then draft the §4.2 redesign — split connection identity, the NULL-tolerant policy rewrite, and real policies for the 5 unpoliced tables. Draft only, back to Spock before anything runs (Rule #3).
+
+**1. Preview verified healthy — real login, not a probe.** Same method as 2026-09-15, deliberately, so the two are comparable. Deployment `resilientsa-d9cddega8`:
+
+```
+1. open Preview            → /join
+2. phone submitted         → OTP retrieved from that deployment's runtime logs
+3. after verify-code       → /profile
+4. /api/me from the browser's own session → 200
+   {"role":"regional_steward","nodeId":"00000000-…-0001","cellId":"c0000000-…-0001"}
+5. /trade → renders the feed      /steward → 403 role gate (answered, not a crash)      /admin → 200
+```
+
+API-level, with a real token: `GET /api/me` **200**, `/api/gifts-profile/me` **200**, `/api/admin/nodes` **200**, `/api/steward/dashboard/<cell>` **403**, `POST /api/auth/request-code` **200**. And the negative check that matters most: **zero** occurrences of `FUNCTION_INVOCATION_FAILED`, `42704`, or `app.current_node_id` in the Preview runtime logs captured during the session. The incident's signature is gone. Loose end closed.
+
+**2. §4.2 redesign drafted** — [`CREW_ORDERS/CREW-ORDER-011-section-4.2-REDESIGN-draft.md`](CREW_ORDERS/CREW-ORDER-011-section-4.2-REDESIGN-draft.md:1), marked **DRAFT — NOT IN FORCE**, nothing executed anywhere. Contents, all grounded in live reads taken today rather than from source:
+
+- **Split connection identity.** Privileged pool (`POSTGRES_URL`, owner, bypasses RLS) for pre-auth and structurally cross-node work only: `session.ts`, `otp.ts`, `auth/[...path].ts`, `me.ts`, `gifts-nudge.ts`, and `listNodes`/`createNode`. App pool (`POSTGRES_URL_APP` → `resilientsa_app`) for everything already wrapped by §4.1. **That reclassifies LOW-006**: `createNode` inserts a node whose `id` can never equal the current context, and `listNodes` for a `regional_steward` spans nodes by design — they are correct as privileged, not defective. That is a better resolution than wrapping them.
+- **A third GUC, `app.current_user_id`.** Not optional: `gifts_profiles`, `grounders` and `programme_offerings` have **no `node_id` column at all**, so ownership is the only boundary expressible for them.
+- **A1 — 20 `ALTER POLICY` statements**, each quoting the live definition with `missing_ok` added. Zero-risk first step: the owner still bypasses RLS, so nothing changes behaviourally, and it makes any future non-owner role fail closed (NULL → filtered → deny) instead of raising `42704`.
+- **A2 — policies for the 5 deny-all tables**, scoped by the boundary each table actually has: `gifts_profiles` own-row read/write plus same-node member read (a steward can read but *not* write another member's profile); `grounders` and `programme_offerings` **global** with authenticated read and owner-restricted writes, consistent with ORDER 008's design where a Grounder is not a resident of any node; `matches` node-scoped through `listing_ids`; `trade_completions` two explicit hops rather than leaning on `matches`' own policy.
+- **A3 — retire three pre-auth policies** (deferred hardening, run last).
+- **Rollout order where the risky step is last**, with the one-line rollback (`unset POSTGRES_URL_APP`) and an explicit "do not reorder" on the step that would otherwise reproduce 2026-09-14 exactly.
+- **A new gate that exercises the application, not the database.** `verify-rls-live.ts` must assert no 5xx on authenticated routes against a *live deployment*, run the §4.3 database assertion, and assert the connection it tests has `rolbypassrls = false`. This is the single most important item in the draft: `verify-rls.ts` would have passed on 2026-09-14 while login was impossible platform-wide.
+
+**A correction to my own numbers, recorded rather than quietly fixed:** the GUC-referencing policy count is **20**, not 21. My 2026-09-15 alert said 21 — I inferred it from "21 tables carry one policy each". The live inventory today shows 23 policies in total: 20 reference `current_setting`, 2 are the `otp_codes` policies, 1 is `session_tokens_user_isolation`. Both the alert's figure and the figure in the Captain's brief are off by one, and the draft carries the corrected count.
+
+**New finding, flagged rather than fixed — the OTP store has a world-readable policy.** `otp_codes_anon_select` is `USING (true)`: on a table holding **live, single-use login codes**. It is inert today only because `neondb_owner` bypasses RLS and no non-owner role has a code path to that table. The moment the app role can reach `otp_codes`, every live OTP is readable in full. A3 drops it; that is a hardening item, not a rollout blocker.
+
+**What's now complete and where it lives:**
+- Preview verified healthy, live, with the incident's 500 signature absent from its runtime logs.
+- [`CREW_ORDERS/CREW-ORDER-011-section-4.2-REDESIGN-draft.md`](CREW_ORDERS/CREW-ORDER-011-section-4.2-REDESIGN-draft.md:1) — Part A SQL (A1/A2/A3/A4), Part B code changes, rollout order, the new gate, 8 open questions for Spock, and a per-table rationale for every policy written.
+- Live facts re-read today for the draft: all 23 policy definitions with their expressions, `rolbypassrls` for both roles, grants on all 27 tables, the 5 deny-all tables, and the call-site map (`withRLSContext` × 31 across 9 files; raw `db` remaining in `auth`, `admin`, `me`).
+
+**What's blocked, and on whom:**
+- **Spock — approval of §4.2 redesign.** Nothing has been run: no SQL, no env var, no code. 8 specific questions are in §7 of the draft, of which three are genuinely decisions rather than confirmations: `notification_log` writes privileged vs wrapped; who may verify a Grounder when a Grounder is global but `node_admin` is node-scoped; and whether matches are guaranteed intra-node (A2's `matches` policy assumes yes).
+- **Spock / Captain — `AGENTS.md` Critical Rule #2** names `DATABASE_URL` as the app's connection variable. It is not; the app uses `POSTGRES_URL`, and the redesign adds `POSTGRES_URL_APP`. Still flagged rather than edited, since it is crew doctrine.
+- **Captain — `POSTGRES_URL_APP` value** will be needed at rollout step 4 (Sensitive, Preview first). Not needed yet.
+- Unchanged and still open: **CRIT-001** (Production still on `bypassrls=true`, `force_rls=0` on all 27 tables); **MED-007** (the two unroutable client routes — `/api/listings` at depth 0 and `/api/marketplace/offerings/mine` at depth 2 — still 404, so the Trade feed cannot show real listings and grounder lookups remain unverifiable live).
+
+**Protocol/pattern checked against:**
+- `AGENTS.md` #1 (build verified before this push), **#3 (no schema change and no connection-identity change — the draft exists precisely because both are Spock's, and its Part B is explicitly not written yet)**, #4 (no dependency added; Playwright again installed under `/tmp`, repo tree clean), #5 (no secrets: the phone and OTP were used only in shell variables and never written to any tracked file; the test OTP was never printed this session; all temp files deleted at session end), #10 (this entry).
+- `SCOTTY_PATTERNS.md` Pattern 003 (an OTP in logs/responses is a live credential — the reason A3 exists), Pattern 005/006 (runtime-only failure modes that build and source review cannot see — the same class as this whole order).
+- `CREW-ORDER-011.md` §4.1/§4.2/§4.3, Spock's §4.2 execution doc, and **ORDER 008 §6** read specifically to ground the `grounders` judgement (Grounder capability derives from the `grounders` row, which is why A2 deliberately adds **no** INSERT policy there — a self-INSERT policy would let any member make themselves a Grounder).
+
+**Anything flagged to Worf or Bones:**
+- **Worf — two items, neither blocking the draft.** (a) `otp_codes_anon_select USING (true)` as above: a credential store with a permissive read policy. (b) A2's `grounders` treatment deliberately *withholds* an INSERT policy for that escalation reason, and the draft says so in-line so a future reader does not "fix" the omission. Also worth Worf's eye: **policy composition** — RLS applies to every table named inside a policy expression, so `programme_offerings_owner_write`'s subquery on `grounders` is itself policy-filtered. That is load-bearing for A2 and fragile if a policy is later relaxed.
+- **Bones — nothing owed.** No human-facing output this session; the draft contains no UI.
+
+**Next:** (1) **Spock approves or amends the §4.2 redesign**, and answers §7's questions. (2) On approval, **Part B** (code) — then rollout in the draft's order, Preview first, gated by `verify-rls-live.ts`. (3) `AGENTS.md` Rule #2 correction. (4) New order for MED-007's two unroutable routes. (5) Bones live pass on `/steward` and `/admin`, still owed since ORDER 009a and now actually testable.
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*

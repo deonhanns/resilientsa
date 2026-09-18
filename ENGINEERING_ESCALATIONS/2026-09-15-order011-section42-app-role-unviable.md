@@ -28,7 +28,7 @@ The Captain reported that switching Production's `DATABASE_URL` to `resilientsa_
 
 Three independent blockers, any one of which is fatal. All three are schema/connection-layer, so all three are Spock's per Rule #3 — **I changed none of them.**
 
-**(a) The policies raise instead of filtering.** All 21 GUC-referencing policies are written as:
+**(a) The policies raise instead of filtering.** All **20** GUC-referencing policies are written as (count corrected 2026-09-18 from 21 — see the note in `WORF_ALERTS/2026-09-15-…` HIGH-005; the live inventory is 23 policies: 20 GUC-referencing, 2 `otp_codes`, 1 `session_tokens`):
 
 ```sql
 CREATE POLICY node_isolation ON users
