@@ -31,7 +31,7 @@ Working directory: `resilientsa-app/`
 
 ### Critical Rules
 1. Run `npm run build` (`tsc -b && vite build`) before every push — zero errors
-2. Never hardcode secrets — env vars only (DATABASE_URL, ENCRYPTION_KEY, AT_API_KEY)
+2. Never hardcode secrets — env vars only. **The application's actual Postgres connection variable is `POSTGRES_URL`** (resolved by `@vercel/postgres`, used in `api/_lib/db.ts`) — **not** `DATABASE_URL`. This was misdocumented here from the project's start and caused a live incident on 2026-09-14/15 (see `OBRIEN_STANDUP.md` and `WORF_ALERTS/2026-09-15-live-incident-order011-section42-app-role-breakage.md`) when an edit to `DATABASE_URL` had no effect on the running app. Also: `ENCRYPTION_KEY`, `AT_API_KEY`. **`POSTGRES_URL_APP`** is a second connection variable introduced by CREW-ORDER-011 §4.2's redesign (split connection identity — see `CREW_ORDERS/CREW-ORDER-011-section-4.2-REDESIGN-draft.md`); it does not exist as a live variable until that order's rollout reaches step 4, but any code referencing it is intentional, not a typo for `POSTGRES_URL`.
 3. Never change database schema without Spock approval — Drizzle migrations are read-only for review
 4. Never add npm dependencies without Captain approval
 5. Never push .env.local, .env.production, or any file containing secrets
@@ -49,6 +49,7 @@ Working directory: `resilientsa-app/`
 - **The discipline that makes handoff possible is non-negotiable during this period:** every session — whether Spock is doing design work, code work, or both — ends with an `OBRIEN_STANDUP.md` entry, written as if narrating to a real O'Brien reading it cold. No informal chat-only summaries; if it isn't in the standup or a `CREW_ORDER`, it didn't happen as far as the ship's records are concerned.
 - **Spock's sandboxed environment cannot reach Vercel, Neon, or any live URL directly.** All live verification (deployment status, runtime logs, actual UI behaviour) depends on the Captain relaying screenshots or copy-pasted output. This is slower and more error-prone than O'Brien's direct CLI/dashboard access, and standup entries from this period should be read with that in mind — verification claims are only as good as what was actually shown to Spock, not independently confirmed.
 - **When O'Brien resumes:** read `OBRIEN_STANDUP.md` from the top of this period forward, `SCOTTY_PATTERNS.md` Patterns 001–007+ in full (all discovered during this period), and this note. Nothing about O'Brien's normal protocol changes once resumed — this section becomes historical, not a permanent change to the crew model.
+- **Status as of 2026-09-11: O'Brien has resumed.** This section is now historical — retained for the record, not describing current operating mode. Spock has since resumed direct execution only for schema/connection-layer decisions reserved by Rule #3 (e.g. CREW-ORDER-011 §4.2), which is the normal chain of command, not a continuation of this interim arrangement.
 
 ### Session Start Protocol
 1. Read the active CREW_ORDER in full
@@ -95,6 +96,12 @@ are being modified. Review only — do not edit or build.
       **RLS has been inert since ORDER 003 on 2026-07-02.** Until §4.2 lands and is verified, the only
       isolation control is application-level `nodeId` filtering inside the route handlers.
       See `WORF_ALERTS/2026-09-11-order009a-role-escalation-review.md` §3.
+      **Update 2026-09-15/18:** the original §4.2 (switch the app's single connection to a non-owner role)
+      was found live-unworkable — it makes login impossible platform-wide, because pre-authentication
+      session lookup cannot be node-scoped. Superseded by a split-connection-identity redesign,
+      drafted and awaiting Spock's approval: `CREW_ORDERS/CREW-ORDER-011-section-4.2-REDESIGN-draft.md`.
+      This checklist item stays CANNOT BE TICKED until that redesign rolls out and its live gate
+      (`verify-rls-live.ts`) passes against Production.
 [ ] No console.log() or equivalent logs PII values
 [ ] API responses never return raw encrypted bytes to the client
 [ ] Founding member data purged on registration confirmation, not retained
@@ -153,7 +160,7 @@ BLOCKED — [reason, do not merge]
 ### Restricted Files — Never Read, Edit, or Commit
 - .env.local
 - .env.production
-- Any file containing ENCRYPTION_KEY, DATABASE_URL, AT_API_KEY values
+- Any file containing ENCRYPTION_KEY, POSTGRES_URL, POSTGRES_URL_APP, AT_API_KEY values (the app's actual connection variable is `POSTGRES_URL`, not `DATABASE_URL` — see Rule #2)
 - drizzle/migrations/ (read-only for review, never edit)
 
 ---
@@ -199,7 +206,7 @@ a working tool fails the test, even if technically functional.
 ### Active Integrations
 | Service            | Purpose              | Env Var        |
 |--------------------|----------------------|----------------|
-| Neon Postgres      | Primary database     | DATABASE_URL   |
+| Neon Postgres      | Primary database     | POSTGRES_URL (see Rule #2 — not DATABASE_URL) |
 | Drizzle ORM        | Schema + queries     | —              |
 | Africa's Talking   | SMS + WhatsApp       | AT_API_KEY, AT_USERNAME |
 | Vercel             | Hosting + deploy     | VERCEL_URL     |
