@@ -377,7 +377,11 @@ This is the change that matters most in this document. `verify-rls.ts` as writte
 
 ## 9. Live state at time of writing (2026-09-18)
 
-Preview, after the Captain's `POSTGRES_URL` revert and redeploy (`resilientsa-d9cddega8`, Ready): a real Playwright login succeeds end to end — `200 request-code`, `200 verify-code`, **`200 /api/me`**, `/trade` renders, `/admin` 200 — with **zero** `FUNCTION_INVOCATION_FAILED` / `42704` entries in its runtime logs. Both environments are therefore healthy on the privileged identity while this draft awaits review. Production is unchanged at commit `ac10e8e`.
+Preview, after the Captain's `POSTGRES_URL` revert and redeploy (`resilientsa-d9cddega8`, Ready): a real Playwright login succeeds end to end — `200 request-code`, `200 verify-code`, **`200 /api/me`**, `/trade` renders, `/admin` 200 — with **zero** `FUNCTION_INVOCATION_FAILED` / `42704` entries in its runtime logs.
+
+Production, same day: healthy on the privileged identity, re-verified after this draft's own docs-push deployed (`resilientsa-b5jhdvlmo`, Ready, 17:34 SAST) — `request-code` 200, unauthenticated `/api/me` 401, `smoke-routes.ts` 15/15. **The API code is identical to commit `ac10e8e`** — the commit this draft was written against; everything after it on `main` is documentation only, so every API-layer statement above still holds as written.
+
+Both environments are therefore healthy on the privileged identity while this draft awaits review, and **no environment currently runs the app role** — that only happens at rollout step 4, after Part B ships.
 
 ---
 
