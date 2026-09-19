@@ -14,6 +14,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSession, unauthorized, forbidden } from '../_lib/session'
 import { withRLSContext } from '../_lib/db-context'
+import { withAppConnection } from '../_lib/with-app-connection'
 import { matches } from '../../src/db/schema/public/matches'
 import { listings } from '../../src/db/schema/public/listings'
 import { eq, and, inArray, desc } from 'drizzle-orm'
@@ -34,7 +35,7 @@ function segments(req: VercelRequest): string[] {
 async function matchesRoot(req: VercelRequest, res: VercelResponse, session: SessionCtx) {
   if (req.method === 'GET') {
     const { user_id } = req.query
-    const rows = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+    const rows = await withRLSContext(session.nodeId, session.userRole, session.userId, async (tx) => {
       const conditions = []
       if (user_id) conditions.push(eq(matches.facilitatedBySteward, user_id as string))
       return tx.select().from(matches)
@@ -54,7 +55,7 @@ async function matchesRoot(req: VercelRequest, res: VercelResponse, session: Ses
       return res.status(400).json({ error: 'listing_ids array with at least 2 IDs required' })
     }
 
-    const result = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+    const result = await withRLSContext(session.nodeId, session.userRole, session.userId, async (tx) => {
       const existing = await tx.select().from(listings)
         .where(and(inArray(listings.id, listing_ids), eq(listings.status, 'open')))
         .limit(listing_ids.length)
@@ -87,7 +88,7 @@ async function matchesRoot(req: VercelRequest, res: VercelResponse, session: Ses
 async function matchConfirm(req: VercelRequest, res: VercelResponse, matchId: string, session: SessionCtx) {
   if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' })
 
-  const result = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+  const result = await withRLSContext(session.nodeId, session.userRole, session.userId, async (tx) => {
     const [match] = await tx.select().from(matches).where(eq(matches.id, matchId)).limit(1)
     if (!match) return null
     if (match.status !== 'proposed') return { conflict: true, current: match.status }
@@ -113,7 +114,7 @@ async function matchConfirm(req: VercelRequest, res: VercelResponse, matchId: st
 async function matchDecline(req: VercelRequest, res: VercelResponse, matchId: string, session: SessionCtx) {
   if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' })
 
-  const result = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+  const result = await withRLSContext(session.nodeId, session.userRole, session.userId, async (tx) => {
     const [match] = await tx.select().from(matches).where(eq(matches.id, matchId)).limit(1)
     if (!match) return null
 
@@ -129,7 +130,7 @@ async function matchDecline(req: VercelRequest, res: VercelResponse, matchId: st
   return res.json((result as any)[0])
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default withAppConnection(async function handler(req: VercelRequest, res: VercelResponse) {
   const session = await getSession(req)
   if (!session) return unauthorized(res)
   const ctx = session as SessionCtx
@@ -142,4 +143,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (p1 === 'decline') return matchDecline(req, res, p0, ctx)
 
   return res.status(404).json({ error: 'Not found' })
-}
+})

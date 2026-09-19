@@ -7,13 +7,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSession, unauthorized } from '../../_lib/session'
 import { withRLSContext } from '../../_lib/db-context'
+import { withAppConnection } from '../../_lib/with-app-connection'
 import { matches } from '../../../src/db/schema/public/matches'
 import { listings } from '../../../src/db/schema/public/listings'
 import { tradeCompletions } from '../../../src/db/schema/public/trade-completions'
 import { connectionEvents } from '../../../src/db/schema/public/connection-events'
 import { eq, inArray } from 'drizzle-orm'
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default withAppConnection(async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   const session = await getSession(req)
   if (!session) return unauthorized(res)
@@ -21,7 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const matchId = req.query.match_id as string
   if (!matchId) return res.status(400).json({ error: 'match_id required' })
 
-  const result = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+  const result = await withRLSContext(session.nodeId, session.userRole, session.userId, async (tx) => {
     const [match] = await tx.select().from(matches).where(eq(matches.id, matchId)).limit(1)
     if (!match) return null
     if (match.status === 'completed') return { conflict: true, message: 'Trade already completed' }
@@ -71,4 +72,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!result) return res.status(404).json({ error: 'Match not found' })
   if ('conflict' in result) return res.status(409).json({ error: (result as any).message })
   return res.json(result)
-}
+})

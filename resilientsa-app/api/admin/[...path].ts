@@ -21,6 +21,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSession, unauthorized, forbidden } from '../_lib/session'
 import { withRLSContext } from '../_lib/db-context'
+import { withAppConnection } from '../_lib/with-app-connection'
 import { db } from '../_lib/db'
 import { users } from '../../src/db/schema/public/users'
 import { nodes } from '../../src/db/schema/public/nodes'
@@ -97,7 +98,7 @@ async function createNode(req: VercelRequest, res: VercelResponse, session: Sess
 // GET /api/admin/cells
 async function listCells(req: VercelRequest, res: VercelResponse, session: SessionCtx) {
   if (session.userRole !== 'node_admin') return forbidden(res)
-  const rows = await withRLSContext(session.nodeId, session.userRole, async (tx) =>
+  const rows = await withRLSContext(session.nodeId, session.userRole, session.userId, async (tx) =>
     tx.select().from(cells).where(eq(cells.nodeId, session.nodeId))
   )
   return res.json({ cells: rows })
@@ -113,7 +114,7 @@ async function createCell(req: VercelRequest, res: VercelResponse, session: Sess
   }
 
   try {
-    const result = await withRLSContext(session.nodeId, session.userRole, async (tx) =>
+    const result = await withRLSContext(session.nodeId, session.userRole, session.userId, async (tx) =>
       tx.insert(cells).values({ nodeId: session.nodeId, name }).returning({ id: cells.id })
     )
     return res.status(201).json({ cellId: result[0].id })
@@ -128,14 +129,14 @@ async function createCell(req: VercelRequest, res: VercelResponse, session: Sess
 // GET /api/admin/members
 async function listMembers(req: VercelRequest, res: VercelResponse, session: SessionCtx) {
   if (session.userRole !== 'node_admin') return forbidden(res)
-  const rows = await withRLSContext(session.nodeId, session.userRole, async (tx) =>
+  const rows = await withRLSContext(session.nodeId, session.userRole, session.userId, async (tx) =>
     tx.select({ id: users.id, displayName: users.displayName, role: users.role, cellId: users.cellId })
       .from(users).where(eq(users.nodeId, session.nodeId))
   )
   return res.json({ members: rows })
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default withAppConnection(async function handler(req: VercelRequest, res: VercelResponse) {
   const session = await getSession(req)
   if (!session) return unauthorized(res)
 
@@ -150,4 +151,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (p0 === 'members' && !p1 && req.method === 'GET') return listMembers(req, res, ctx)
 
   return res.status(404).json({ error: 'Not found' })
-}
+})

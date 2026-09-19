@@ -23,9 +23,17 @@
 //   - RLS enforced -> 0 rows, because no policy can be satisfied
 //   - RLS inert    -> all rows come back, because the connection is the table owner
 //
-// ⚠ EXPECTED TO FAIL UNTIL CREW-ORDER-011 §4.2 LANDS. §4.2 is a schema / connection-role
-// change and is Spock's, per Rule #3. See
-// WORF_ALERTS/2026-09-11-order009a-role-escalation-review.md §3.
+// ⚠ NECESSARY BUT NOT SUFFICIENT — CREW-ORDER-011 §4.2 update, 2026-09-19.
+// This exercises the DATABASE with the RLS context supplied. It does not exercise the
+// running application, and a PASS here says nothing about whether the app can serve a
+// request: on 2026-09-14 this script's criteria would have been met while login was
+// impossible platform-wide. scripts/verify-rls-live.ts is the application-level gate and
+// is the one §4.2's rollout requires before Production.
+//
+// It also no longer prefers DATABASE_URL (which the application never used —
+// @vercel/postgres resolves POSTGRES_URL), and it REFUSES to report a result for a role
+// that carries BYPASSRLS, because such a run proves nothing in either direction.
+// See WORF_ALERTS/2026-09-14-live-incident-order011-section42-app-role-breakage.md.
 //
 // WHY A TRANSACTION
 // `set_config(..., true)` is transaction-local, and the Neon HTTP driver issues one
@@ -36,18 +44,24 @@
 //
 // USAGE
 //   cd resilientsa-app
-//   npx tsx scripts/verify-rls.ts
-// Exits 0 = RLS enforced. 1 = RLS not enforced. 3 = inconclusive (no data to probe).
+//   npx tsx scripts/verify-rls.ts                    # uses POSTGRES_URL_APP
+//   npx tsx scripts/verify-rls.ts "postgres://..."   # or an explicit connection string
+// Exits 0 = RLS enforced. 1 = RLS not enforced. 2 = could not run. 3 = inconclusive
+// (no data to probe). 4 = REFUSED — the role bypasses RLS, so nothing was proven.
 import dotenv from 'dotenv'
 import { neon } from '@neondatabase/serverless'
 
 dotenv.config({ path: '.env.local' })
 dotenv.config()
 
-const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL
+// Resolution order, deliberately: POSTGRES_URL_APP first (the non-owner role the
+// application is supposed to run as, and the only one that can demonstrate anything),
+// then an explicit argument, and only then POSTGRES_URL — the table owner, whose result
+// is refused below rather than reported as a misleading FAIL.
+const url = process.env.POSTGRES_URL_APP ?? process.argv[2] ?? process.env.POSTGRES_URL
 if (!url) {
-  console.error('\nDATABASE_URL / POSTGRES_URL is not set — cannot exercise RLS.')
-  console.error('Run from resilientsa-app/ with .env.local present, or export DATABASE_URL.\n')
+  console.error('\nNo connection string available — set POSTGRES_URL_APP, pass one as an')
+  console.error('argument, or run from resilientsa-app/ with .env.local present.\n')
   process.exit(2)
 }
 
@@ -76,6 +90,19 @@ async function main() {
   `)
   const who = roleRows[0]?.role ?? '(unknown)'
   console.log(`connection role : ${who}   (superuser=${roleRows[0]?.rolsuper}, bypassrls=${roleRows[0]?.rolbypassrls})`)
+
+  // §6 assertion 4 — the identity assertion. A BYPASSRLS role never evaluates a policy,
+  // so a FAIL for the owner would be as misleading as a PASS would be. Refuse instead.
+  if (roleRows[0]?.rolbypassrls !== false) {
+    console.error(`\nREFUSED — connected as "${who}", with rolbypassrls=${roleRows[0]?.rolbypassrls}.`)
+    console.error('PostgreSQL does not evaluate row security policies for such a role, so this')
+    console.error('run cannot demonstrate whether enforcement works, in either direction.')
+    console.error('Test the application role instead, e.g.:')
+    console.error('  POSTGRES_URL_APP="postgres://resilientsa_app:<pw>@<same-host>/<db>" \\')
+    console.error('    npx tsx scripts/verify-rls.ts')
+    console.error('Exit 4 is deliberately distinct from FAIL (1): nothing was proven here.\n')
+    process.exit(4)
+  }
 
   const tableRows = rowsOf(await sql`
     SELECT relname, relrowsecurity, relforcerowsecurity, relowner::regrole::text AS owner_role
@@ -145,10 +172,13 @@ async function main() {
 
   console.error(`❌ FAIL — ${contexted} of ${baseline} users rows were visible under a node context that`)
   console.error('   matches NO node. RLS is ENABLED but NOT ENFORCED for this connection.')
+  // Note: this branch is only reachable for a role that does NOT carry BYPASSRLS (that
+  // case exits 4 above). An owner without BYPASSRLS is still exempt from its own policies
+  // unless FORCE ROW LEVEL SECURITY is set — which is why ownership is named as a cause.
   if (ownsSomething) console.error(`   Cause: we connect as "${who}", which OWNS the table.`)
   if (!anyForced) console.error('   Cause: no table has FORCE ROW LEVEL SECURITY.')
-  console.error('   Required: CREW-ORDER-011 §4.2 — a dedicated non-owner application role, and/or')
-  console.error("   FORCE ROW LEVEL SECURITY. That change is Spock's, per Rule #3.")
+  console.error('   The connection identity is the fix, not FORCE RLS alone — a BYPASSRLS role')
+  console.error('   ignores FORCE RLS too. See CREW-ORDER-011 §4.2 redesign, approved 2026-09-18.')
   console.error('   Do NOT enter real community-member PII until this passes.\n')
   process.exit(1)
 }

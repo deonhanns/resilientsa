@@ -20,6 +20,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSession, unauthorized, forbidden } from '../../_lib/session'
 import { withRLSContext, type RlsTx } from '../../_lib/db-context'
+import { withAppConnection } from '../../_lib/with-app-connection'
 import { users } from '../../../src/db/schema/public/users'
 import { cells } from '../../../src/db/schema/public/cells'
 import { giftsProfiles } from '../../../src/db/schema/public/gifts-profiles'
@@ -50,7 +51,7 @@ async function dashboard(req: VercelRequest, res: VercelResponse, cellId: string
   }
 
   try {
-    const result = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+    const result = await withRLSContext(session.nodeId, session.userRole, session.userId, async (tx) => {
       const [cell] = await tx
         .select({ id: cells.id, name: cells.name, stewardUserId: cells.stewardUserId })
         .from(cells).where(and(eq(cells.id, cellId), eq(cells.nodeId, session.nodeId)))
@@ -144,7 +145,7 @@ async function isolates(req: VercelRequest, res: VercelResponse, cellId: string,
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
 
-    const result = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+    const result = await withRLSContext(session.nodeId, session.userRole, session.userId, async (tx) => {
       const cellMembers = await tx
         .select({ id: users.id, displayName: users.displayName })
         .from(users).where(and(eq(users.cellId!, cellId), eq(users.nodeId, session.nodeId)))
@@ -194,7 +195,7 @@ async function hubs(req: VercelRequest, res: VercelResponse, cellId: string, ses
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
 
-    const result = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+    const result = await withRLSContext(session.nodeId, session.userRole, session.userId, async (tx) => {
       const cellMembers = await tx
         .select({ id: users.id, displayName: users.displayName, role: users.role })
         .from(users).where(and(eq(users.cellId!, cellId), eq(users.nodeId, session.nodeId)))
@@ -315,7 +316,7 @@ async function networkSummary(req: VercelRequest, res: VercelResponse, cellId: s
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-    const result = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+    const result = await withRLSContext(session.nodeId, session.userRole, session.userId, async (tx) => {
       const [cell] = await tx.select({ id: cells.id }).from(cells)
         .where(and(eq(cells.id, cellId), eq(cells.nodeId, session.nodeId)))
       if (!cell) return { error: 'Cell not found', status: 404 as const }
@@ -369,7 +370,7 @@ async function networkSummary(req: VercelRequest, res: VercelResponse, cellId: s
   }
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default withAppConnection(async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   const session = await getSession(req)
@@ -388,4 +389,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (op === 'network-summary') return networkSummary(req, res, cellId, ctx)
 
   return res.status(404).json({ error: 'Not found' })
-}
+})

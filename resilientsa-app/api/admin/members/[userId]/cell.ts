@@ -15,13 +15,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSession, unauthorized, forbidden } from '../../../_lib/session'
 import { withRLSContext } from '../../../_lib/db-context'
+import { withAppConnection } from '../../../_lib/with-app-connection'
 import { users } from '../../../../src/db/schema/public/users'
 import { cells } from '../../../../src/db/schema/public/cells'
 import { eq } from 'drizzle-orm'
 
 type SessionCtx = { userId: string; userRole: string; nodeId: string }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default withAppConnection(async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' })
 
   const session = await getSession(req)
@@ -39,7 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const result = await withRLSContext(ctx.nodeId, ctx.userRole, async (tx) => {
+    const result = await withRLSContext(ctx.nodeId, ctx.userRole, ctx.userId, async (tx) => {
       const [targetUser] = await tx.select({ id: users.id, nodeId: users.nodeId })
         .from(users).where(eq(users.id, targetUserId))
       if (!targetUser) return { error: 'No user found with that id', status: 404 as const }
@@ -61,4 +62,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('assignCell error:', err)
     return res.status(500).json({ error: 'Internal server error' })
   }
-}
+})

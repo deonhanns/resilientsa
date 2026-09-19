@@ -13,6 +13,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSession, unauthorized } from '../_lib/session'
 import { withRLSContext } from '../_lib/db-context'
+import { withAppConnection } from '../_lib/with-app-connection'
 import { listings } from '../../src/db/schema/public/listings'
 import { users } from '../../src/db/schema/public/users'
 import { eq, and, desc, sql } from 'drizzle-orm'
@@ -34,7 +35,7 @@ async function listingsRoot(req: VercelRequest, res: VercelResponse, session: Se
   if (req.method === 'GET') {
     const { cell_id, pillar, type, status } = req.query
 
-    const rows = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+    const rows = await withRLSContext(session.nodeId, session.userRole, session.userId, async (tx) => {
       const conditions = [eq(listings.nodeId, session.nodeId)]
       if (cell_id)  conditions.push(eq(listings.cellId, cell_id as string))
       if (status)   conditions.push(eq(listings.status, status as any))
@@ -54,7 +55,7 @@ async function listingsRoot(req: VercelRequest, res: VercelResponse, session: Se
       return res.status(400).json({ error: 'type, pillar_tags, and title are required' })
     }
 
-    const [user] = await withRLSContext(session.nodeId, session.userRole, (tx) =>
+    const [user] = await withRLSContext(session.nodeId, session.userRole, session.userId, (tx) =>
       tx.select({ cellId: users.cellId }).from(users).where(eq(users.id, session.userId)).limit(1)
     )
 
@@ -62,7 +63,7 @@ async function listingsRoot(req: VercelRequest, res: VercelResponse, session: Se
       return res.status(400).json({ error: 'You must be assigned to a cell before posting a listing' })
     }
 
-    const [listing] = await withRLSContext(session.nodeId, session.userRole, (tx) =>
+    const [listing] = await withRLSContext(session.nodeId, session.userRole, session.userId, (tx) =>
       tx.insert(listings).values({
         nodeId:      session.nodeId,
         cellId:      user.cellId!,
@@ -85,7 +86,7 @@ async function listingById(req: VercelRequest, res: VercelResponse, id: string, 
   if (req.method === 'PATCH') {
     const { title, description, status, expected_status } = req.body
 
-    const rows = await withRLSContext(session.nodeId, session.userRole, async (tx) => {
+    const rows = await withRLSContext(session.nodeId, session.userRole, session.userId, async (tx) => {
       const [existing] = await tx
         .select().from(listings)
         .where(and(eq(listings.id, id), eq(listings.userId, session.userId)))
@@ -115,7 +116,7 @@ async function listingById(req: VercelRequest, res: VercelResponse, id: string, 
   }
 
   if (req.method === 'DELETE') {
-    const rows = await withRLSContext(session.nodeId, session.userRole, (tx) =>
+    const rows = await withRLSContext(session.nodeId, session.userRole, session.userId, (tx) =>
       tx.update(listings)
         .set({ status: 'withdrawn', updatedAt: new Date() })
         .where(and(eq(listings.id, id), eq(listings.userId, session.userId)))
@@ -129,7 +130,7 @@ async function listingById(req: VercelRequest, res: VercelResponse, id: string, 
   return res.status(405).json({ error: 'Method not allowed' })
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default withAppConnection(async function handler(req: VercelRequest, res: VercelResponse) {
   const session = await getSession(req)
   if (!session) return unauthorized(res)
   const ctx = session as SessionCtx
@@ -139,4 +140,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!p0) return listingsRoot(req, res, ctx)
   return listingById(req, res, p0, ctx)
-}
+})
