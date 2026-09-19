@@ -922,6 +922,43 @@ and, for assertion 3, a baseline that fits a non-bypassing role: establish **vis
 
 ---
 
+---
+
+### 2026-09-19 (cont. 4) — A1-revision applied (18 policies guarded). **STOPPED**: the ruling covered 18 of 23, and the same class survives in 5 A2-era policies.
+
+**Applied the A1-revision exactly as ruled** — [`scripts/sql/2026-09-19-order011-4.2-a1-revision-nullif.sql`](resilientsa-app/scripts/sql/2026-09-19-order011-4.2-a1-revision-nullif.sql:1) carries Spock's SQL verbatim, applied through the existing `apply-rls-redesign.ts` harness as step `a1r` (idempotent, one transaction, before/after assertions). Verified from the **live expression text**, not from the harness's own summary:
+
+```
+public.users :: node_isolation
+  (node_id = (NULLIF(current_setting('app.current_node_id'::text, true), ''::text))::uuid)   ✓
+```
+
+Policy count 30 → 30, zero-policy tables 0, contextless owner reads unchanged (users 10, listings 1). The 18 targeted policies are guarded.
+
+**A self-catch worth recording, because it is the mirror image of the failure this order exists to remove.** I added a metric to the applier — policies casting to `uuid` with no `nullif` guard — and its first run reported **FAIL, 23 unguarded, before *and* after**, implying the DDL had not applied. It had. PostgreSQL renders the function name **upper case** (`NULLIF(`), and my pattern was a case-sensitive `LIKE '%nullif(%'`, so it matched nothing and manufactured a **false failure**. I did not accept the verdict: I read the live expression for four policies, saw the guard present, and only then fixed the metric to `ILIKE`. It now reads the correct 5. **A metric that lies toward FAILURE is as corrosive as one that lies toward PASS** — both destroy trust in the instrument, and this one nearly had me report a working change as broken.
+
+**⚑ NEW FINDING — the ruling's scope is incomplete, and I am stopping rather than deciding it.** The file contains 18 `::uuid` casts, matching the ruling's count. The database contains **23 policies** with an unguarded `::uuid` cast: the five additional ones are the policies **A2 added**, which the ruling did not cover because it reasoned from the A1 file:
+
+| Policy | Casts |
+|---|---|
+| `public.gifts_profiles :: gifts_profiles_read` | `app.current_node_id` (inside the users subquery) |
+| `public.matches :: matches_node_isolation` | `app.current_node_id` (USING and WITH CHECK) |
+| `public.trade_completions :: trade_completions_node_isolation` | `app.current_node_id` |
+| `public.grounders :: grounders_owner_update` | `app.current_user_id` |
+| `public.programme_offerings :: programme_offerings_owner_write` | `app.current_user_id` |
+
+Same class of defect, same fix shape (`nullif(..., '')`), and the two `current_user_id` casts are exposed for the same reason — the empty-string behaviour applies to *any* unset custom GUC on this platform, not just `current_node_id`. The applier's own `a1r` assertion is what surfaced it: it read 5 unguarded and refused the run, which I take as correct signal that the goal ("an absent context fails closed, never raises") is not yet met.
+
+**⚑ And the behaviour is INTERMITTENT, which is worse than a constant.** On the session that first exposed this, `current_setting('app.current_node_id', true)` returned `''` and a contextless read raised `22P02`. On a later session the same contextless reads of `matches`, `trade_completions`, `gifts_profiles`, `programme_offerings` and `users` all returned a clean **0** — meaning the GUC presented as NULL that time. So the empty-string state is **not stable per connection**: this is a *flaky* 500 risk rather than a deterministic one, which is precisely how it stayed invisible, and why **a single green run proves nothing about it**. It also explains the earlier anomaly where `verify-rls.ts` reported a 0 baseline in one run and threw `22P02` in another.
+
+**Deliberately NOT done, and this is a judgement I want on the record rather than buried:** I did not rewrite assertion 3, and I did not re-run step 5. Running step 5 now would very probably return **exit 0** — every path the gate exercises sets all three GUCs, so neither the 18 nor the 5 unguarded casts would be touched — and merging on that would leave a same-class defect behind on the strength of a test that structurally cannot see it. That is the wrong call to make unilaterally, and it is exactly the "anything else surfaces" case the ruling told me to stop on.
+
+**Recommendation (one ruling, then everything lands together):** extend the same `nullif` treatment to those five, including the `app.current_user_id` casts. End state, assertable by the applier as written: **`uuid casts WITHOUT nullif guard = 0`** — at which point the `a1r` assertion passes, assertion 3 can be rewritten per the ruling, and step 5 runs **once**, on a database where the fail-closed property is actually true rather than true on most connections.
+
+**State:** DB carries the approved A1-revision (18 guarded) on the shared database; no environment variable touched. Branch `order-011-4.2-part-b` carries the new SQL + the applier's `a1r` step and metric. Production untouched and healthy. **Nothing merged.**
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*

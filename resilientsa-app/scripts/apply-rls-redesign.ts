@@ -40,6 +40,12 @@ dotenv.config()
 const APPS: Record<string, string> = {
   a1: 'scripts/sql/2026-09-19-order011-4.2-a1-null-tolerant-policies.sql',
   a2: 'scripts/sql/2026-09-19-order011-4.2-a2-new-policies.sql',
+  // STEP 1b — A1 revision. Authority:
+  // CREW-ORDERS/CREW-ORDER-011-section-4.2-A1-revision-nullif.md (Spock, 2026-09-19).
+  // Wraps every uuid-cast current_setting() in nullif(..., '') because on this platform
+  // an unset custom GUC arrives as an EMPTY STRING, not NULL — so missing_ok alone did
+  // not stop an absent context from raising 22P02 instead of failing closed.
+  a1r: 'scripts/sql/2026-09-19-order011-4.2-a1-revision-nullif.sql',
 }
 
 const which = (process.argv[2] ?? '').toLowerCase()
@@ -65,6 +71,8 @@ type Snap = {
   policyTotal: number
   gucNoMissingOk: number
   gucWithMissingOk: number
+  /** Policy expressions that cast current_setting to uuid with NO nullif guard. */
+  uuidCastNoNullif: number
   roleOnlyPolicies: number
   zeroPolicyTables: string[]
   usersRows: number
@@ -77,7 +85,11 @@ async function snapshot(c: InstanceType<typeof Client>): Promise<Snap> {
   const pol = await c.query(`
     SELECT count(*)::int AS total,
       count(*) FILTER (WHERE expr LIKE '%current_setting%' AND expr NOT LIKE '%current_setting% true%')::int AS guc_no_missing_ok,
-      count(*) FILTER (WHERE expr LIKE '%current_setting% true%')::int AS guc_with_missing_ok
+      count(*) FILTER (WHERE expr LIKE '%current_setting% true%')::int AS guc_with_missing_ok,
+      -- ILIKE, not LIKE: PostgreSQL normalises the function name to upper case in
+      -- pg_get_expr output ("NULLIF(...)"), so a case-sensitive pattern silently
+      -- reported 0 matches and produced a FALSE FAILURE on the first a1r run.
+      count(*) FILTER (WHERE expr LIKE '%::uuid%' AND expr NOT ILIKE '%nullif(%')::int AS uuid_cast_no_nullif
     FROM (
       SELECT coalesce(pg_get_expr(p.polqual, p.polrelid), '') || ' ' ||
              coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '') AS expr
@@ -103,6 +115,7 @@ async function snapshot(c: InstanceType<typeof Client>): Promise<Snap> {
     policyTotal: pol.rows[0].total,
     gucNoMissingOk: pol.rows[0].guc_no_missing_ok,
     gucWithMissingOk: pol.rows[0].guc_with_missing_ok,
+    uuidCastNoNullif: pol.rows[0].uuid_cast_no_nullif,
     roleOnlyPolicies: 0,
     zeroPolicyTables: zero.rows.map((r: any) => r.t),
     usersRows: u.rows[0].n,
@@ -116,6 +129,7 @@ function show(label: string, s: Snap) {
   console.log(`  total policies             : ${s.policyTotal}`)
   console.log(`  GUC policies WITHOUT missing_ok : ${s.gucNoMissingOk}`)
   console.log(`  GUC policies WITH missing_ok    : ${s.gucWithMissingOk}`)
+  console.log(`  uuid casts WITHOUT nullif guard : ${s.uuidCastNoNullif}`)
   console.log(`  RLS-enabled, ZERO policies : ${s.zeroPolicyTables.length}${s.zeroPolicyTables.length ? ' -> ' + s.zeroPolicyTables.join(', ') : ' -> (none)'}`)
   console.log(`  contextless count users    : ${s.usersRows}`)
   console.log(`  contextless count listings : ${s.listingsRows}`)
@@ -168,6 +182,14 @@ async function main() {
         problems.push(`policy count changed ${before.policyTotal} -> ${after.policyTotal} (A1 must only ALTER, never add/drop)`)
       if (after.zeroPolicyTables.length !== before.zeroPolicyTables.length)
         problems.push('the zero-policy table set changed (A1 must not affect it)')
+    }
+    if (which === 'a1r') {
+      if (after.uuidCastNoNullif !== 0)
+        problems.push(`${after.uuidCastNoNullif} policy expression(s) still cast to uuid with no nullif guard`)
+      if (after.policyTotal !== before.policyTotal)
+        problems.push(`policy count changed ${before.policyTotal} -> ${after.policyTotal} (a1r must only ALTER, never add/drop)`)
+      if (after.zeroPolicyTables.length !== before.zeroPolicyTables.length)
+        problems.push('the zero-policy table set changed (a1r must not affect it)')
     }
     if (which === 'a2') {
       if (after.zeroPolicyTables.length !== 0)
