@@ -781,6 +781,55 @@ All business logic preserved verbatim (same imports, same queries, same RLS cont
 
 ---
 
+---
+
+### 2026-09-19 (cont.) — §4.2 STEP 5: gate run **FAILS** (exit 1). Step 4 was half-done; a pre-existing production bug found; and my own gate passed over a live 500.
+
+**Gate result, plainly: exit 1 — FAIL.** Composition at the end of the session:
+
+```
+routing/health (smoke-routes) : PASS   (15/15 routed)
+authenticated 5xx check       : PASS   <- but read the next line
+DB enforcement + identity     : REFUSED — connected as neondb_owner
+```
+
+**Step 4 was only half-executed, and step 5 caught it.** `POSTGRES_URL_APP` was created on Preview ~20:50 SAST; the newest Preview deployment had been built at **14:27:33 SAST** — over six hours earlier. Vercel applies an env var only to a *new* deployment, and step 4's own approved text says "Set POSTGRES_URL_APP on Preview **; redeploy**". So the first gate run failed with 503s on node-scoped routes: the running builds still had no app pool. This is the same mechanism that made 2026-09-14 confusing. **Authorised by the Captain, I redeployed Preview** (`vercel redeploy <url> --target preview`, explicitly Preview-only) → `resilientsa-r3m8bbmjm`. That put the app pool live: `/api/gifts-profile/me` went **503 → 200**, which proves the app-role connection, the RLS context threading and A2's `gifts_profiles` policy all work end-to-end. I did **not** roll that redeploy back — reverting it would return Preview to 503-on-everything, which is strictly worse, and the gate's rollback instruction is for a *design* failure, not this.
+
+**I could not do the other half of what was authorised, and it needs a decision.** The Captain authorised me to add `POSTGRES_URL_APP` to `.env.local` so assertion 3 could run — but the value is a Vercel **Sensitive** var, which is write-only. Verified: `vercel env pull` returns the literal `[SENSITIVE]`. I cannot read it, so I cannot place it anywhere, and **assertion 3 (database enforcement + the `rolbypassrls=false` identity check) cannot execute for any operator from the Vercel side.** That is a gap in my own approved §6 design: it assumed the operator environment holds the app-role string. Step 5 as written cannot reach exit 0 without the value being supplied out-of-band — into `.env.local` by someone who has it, or by amending the gate.
+
+**A pre-existing production bug, unrelated to this order — and this is the substantive finding.** `GET /api/marketplace/offerings` (the Community Marketplace browse, with or without query params) returns **500 on Production too**, on the privileged owner connection with no Part B anywhere in sight:
+
+```
+PRODUCTION (privileged, no Part B)  offerings=500   ?pillar=water=500   ?search=a=500
+PREVIEW   (app role, Part B)        offerings=500   ?pillar=water=500   ?search=a=500
+```
+
+Postgres `42601` — a **syntax error**, not a policy denial. It cannot be RLS: it fails at parse time, before any policy is evaluated, and it fails identically for a role that bypasses RLS entirely. The generated SQL names the cause:
+
+```
+... inner join offering_engagements oe ON "offering_endorsements"."engagement_id" = oe.id on  where oe.offering_id = ANY(($1, $2, ...))
+```
+
+A stray `on ` with an empty condition immediately before `where` — a malformed Drizzle query in the browse path. **ORDER 008's main screen has been broken in production independent of ORDER 011**, and this rollout neither caused nor fixed it. It was found only because step 5 made me probe every route on a live deployment rather than the ones I had reason to suspect. Needs its own order; not touched.
+
+**⚠ The worst finding is against my own gate.** It reported `authenticated 5xx check: PASS` while that 500 sat in the deployment it was testing. Its route list contains **zero** probes of `/api/marketplace/offerings`. A gate whose entire purpose is to catch a live 5xx reported PASS over a live 5xx — the precise false-confidence failure it was written to prevent, committed by the gate itself, on its first real use. Two defects to fix, both mine, both needing Spock because they touch the artifact now under validation:
+1. **Coverage:** the authenticated matrix must probe every route the client actually calls, not a hand-picked four. Adding `/api/marketplace/offerings` alone would have turned this run red.
+2. **Verdict mapping:** when assertion 3 returns 4 (REFUSED — nothing proven), the verdict code treats it as FAIL (exit 1). "Nothing proven" is *inconclusive*, not "enforcement failed" — those need different exit codes and different operator responses. A REFUSED gate should be impossible to read as either a pass or a proven failure.
+
+**A methodology error of mine, recorded because it is the same disease.** My first gate run printed `exit 0`. It was not a pass: I was on `main`, where the branch's `verify-rls-live.ts` does not exist, so `npx tsx` died with `ERR_MODULE_NOT_FOUND` — and my own `grep` filter hid the error while `PIPESTATUS[0]` read the wrong stage. I caught it only by re-running unfiltered. **A filtered pipeline around a verification step is how a false PASS is manufactured**, and I built one. No result from this session is reported from a filtered pipeline.
+
+**Deliberately not done, per the order's stop-on-failure instruction:** no merge to `main` (the gate failed), no proposal of step 6, no attempt to fix either the marketplace bug or my gate's coverage. `main` remains `0b1d77e`; the branch remains `5aa762e` plus this record.
+
+**Protocol/pattern checked against:** `AGENTS.md` #1 (build clean before this push), **#2/#5 (nothing secret read, printed, or staged — `POSTGRES_URL_APP` was never obtained; the Vercel env list and pull were inspected for *names and type only*)**, **#3 (no schema or connection change made — the redeploy applies an already-approved step, and the two gate defects are escalated rather than fixed)**, #4 (no dependency added), #10 (this entry) · `SCOTTY_PATTERNS.md` Patterns 003/005 · and the 2026-09-14 incident record, whose central lesson — *an env var change does not reach a running deployment without a new one* — repeated here almost exactly.
+
+**Anything flagged to Worf or Bones:**
+- **Worf — MED-008, new: the Marketplace browse is broken in production.** Not a security issue, but it is a user-facing 500 on a Bones-approved screen, so Worf and Bones both have an interest: Bones' ORDER 008 verdict was passed against a screen whose data path 500s. Filed here rather than as a Worf alert because it is functional, not a POPIA/security finding.
+- **Bones — ORDER 008's live verdict needs revisiting.** Its `CONDITIONAL PASS` can only have been judged against a prototype or source, because the live browse route cannot return data at all.
+
+**Next:** (1) **Spock — decide how assertion 3 gets its credential**, and whether the gate's coverage/verdict-mapping fixes land before step 5 is re-run (I recommend yes to both: as it stands the gate is not fit to be the sole promotion gate). (2) **Captain — supply the `resilientsa_app` connection string out-of-band** (placing it in `.env.local` is simplest; that file is gitignored and restricted) after which assertion 3 can run and step 5 can be re-attempted. (3) New order for the marketplace browse bug. (4) Step 6 remains untouched and unproposed.
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*
