@@ -1395,6 +1395,76 @@ API-level, with a real token: `GET /api/me` **200**, `/api/gifts-profile/me` **2
 
 ---
 
+### 2026-09-19 — CREW-ORDER-011 §4.2 rollout, steps 1–3 complete: A1/A2 applied, Part B built, fail-closed proven live. Stopped at the step-4 checkpoint.
+
+**Context:** Spock approved the redesign in full ([`approval`](CREW_ORDERS/CREW-ORDER-011-section-4.2-REDESIGN-approval.md:1)) — all 8 questions answered. Ordered to execute the draft's own §5 rollout **through step 3 only**, then stop before touching any live environment variable. Step 4 (first `POSTGRES_URL_APP` on Preview) is the one checkpoint Spock added.
+
+**First finding: Preview and Production are ONE database.** The order said "run A1 on Preview's database, then Production's". Before treating that as two targets I tested it: a session token minted seconds earlier in this database authenticated **200 against both** Preview and Production. A random-UUID token exists in exactly one database, so both environments are on the same one — meaning steps 1 and 2 are each a **single** DDL execution, not two. Worth recording explicitly rather than silently running it once and implying twice. *(Probe token deleted immediately after.)*
+
+**Step 1 — A1 applied. Confirmed behaviour-neutral, not assumed:**
+
+```
+BEFORE  policies=23  GUC-without-missing_ok=20  GUC-with=0   zero-policy tables=5  users=10  listings=1
+AFTER   policies=23  GUC-without-missing_ok=0   GUC-with=20  zero-policy tables=5  users=10  listings=1
+```
+
+Policy count unchanged (A1 only ALTERs — nothing added or dropped), the zero-policy set unchanged, and the contextless read *as the connected role* still returns every row, which is the concrete proof that `neondb_owner` still bypasses RLS. The applier asserts all three and exits non-zero if any breaks.
+
+**Step 2 — A2 applied. Confirmed the same way:**
+
+```
+BEFORE  policies=23  zero-policy tables=5
+AFTER   policies=30  zero-policy tables=0   (+7: the 5 tables now carry real policies)
+```
+
+`users` and `listings` contextless counts identical before/after. The audit query named in the approved draft's A2 comment block now returns **zero** rows.
+
+**Step 3 — Part B written and shipped to a branch only.**
+
+- [`api/_lib/db-app.ts`](resilientsa-app/api/_lib/db-app.ts:1) — app-role pool from `POSTGRES_URL_APP`, built lazily (Pattern 005: a config gap must not become an import-time crash), throwing a **typed** `AppConnectionUnavailableError` when unset. **No fallback to the privileged pool** — approval answer 6 made that non-negotiable.
+- [`api/_lib/db-context.ts`](resilientsa-app/api/_lib/db-context.ts:1) — now runs on that pool and sets a **third** GUC, `app.current_user_id`.
+- [`api/_lib/with-app-connection.ts`](resilientsa-app/api/_lib/with-app-connection.ts:1) — maps that one typed error to a clean 503 and **re-throws everything else unchanged**, so no other behaviour moves.
+- **31 call sites across 9 route files** now thread `session.userId`; all 9 default exports wrapped. Verified by count, not by eye: 31 total, 0 lacking `userId`.
+- [`scripts/verify-rls.ts`](resilientsa-app/scripts/verify-rls.ts:1) — no longer prefers `DATABASE_URL`, and now **refuses** to report anything for a role carrying `BYPASSRLS`. Live-verified: against `neondb_owner` it prints REFUSED and exits **4**.
+- [`scripts/verify-rls-live.ts`](resilientsa-app/scripts/verify-rls-live.ts:1) — the §6 gate. Reuses `smoke-routes.ts` and `verify-rls.ts` **by execution rather than forking them**.
+
+**Live Preview verification of the fail-closed state** (`resilientsa-q42wm5fxx`, branch `order-011-4.2-part-b`, `POSTGRES_URL_APP` unset): privileged pool completely unaffected — `GET /api/me` **200**, `GET /api/admin/nodes` **200**, `POST /api/auth/request-code` **200**. Node-scoped fails closed: `GET /api/gifts-profile/me` **503**, `PUT /api/gifts-profile/me` **503**, `GET /api/marketplace/offerings` **503**, all returning `{"error":"Service unavailable"}` with no internals.
+
+Two honest caveats on that matrix. `GET /api/listings/<id>` returned 405, `GET /api/steward/dashboard/<cell>` and the two admin read routes 403, and `GET /api/matches/<id>` 404 — in every case the handler's **method or role gate fires before the app pool is reached**, so 503 is not observable there with this account (a `regional_steward`). That is correct existing behaviour, not a gap in fail-closed; it is simply why the 503 evidence comes from gifts-profile and marketplace. And `POST /api/listings` returned the platform 404 from ORDER 010's depth-0 rule, unrelated to this change (MED-007).
+
+**The gate was validated in both directions, because a gate only ever seen passing is not evidence.** Run A, no session token: routing PASS, authenticated **INCONCLUSIVE**, DB check **REFUSED** → **exit 3**, explicitly refusing to call itself a pass. Run B, with a real token: `GET /api/gifts-profile/me` **FAIL 503** while `/api/me`, `/api/admin/nodes` and `request-code` stayed ok and a 403 on `/api/steward` correctly did **not** count as failure → **exit 1, "do NOT proceed."** So the gate fails the current state, exactly as it should, and would have failed the 2026-09-14 rollout.
+
+**⚠ Finding worth more than this order: `npx tsc -p api/tsconfig.json --noEmit` checks NOTHING.** I suspected it when it stayed silent about three files using an unimported identifier, so I planted a deliberate `const x: number = "string"` canary — and tsc still reported **only** `TS5107`. The config-level deprecation error short-circuits file checking entirely. Consequences, stated plainly:
+
+1. **Every past "api typecheck clean apart from the pre-existing TS5107" claim in this document was vacuous.** The command could not have detected anything. The 2026-09-13 note that "tsc was clean while marketplace still had all 8 sites unconverted" was at least partly this, not only the closure-assignability explanation recorded there.
+2. Real checking needs `--ignoreDeprecations 6.0`, which then surfaces file errors alongside a 28-line pre-existing `TS5107`/`TS6059` rootDir noise floor. With that flag, Part B is clean.
+3. **Neither `npm run build` nor Vercel typechecks `api/` at all** (the app project excludes it; `@vercel/node` transpiles per file). A `TS2304` such as a missing import would **ship** and fail at runtime. I found three of those in this very change — `steward/[op]/[cellId].ts`, `admin/members/[userId]/cell.ts` and `role.ts` — because their `db-context` import lines differed (a combined `{ withRLSContext, type RlsTx }`, and `../../../` three levels) and my anchored rewrite refused them rather than corrupting them. A scripted rewrite that had been sloppier would have shipped three broken routes.
+
+**Deviation from the approved text, disclosed:** A2's `CREATE POLICY` statements are each preceded by `DROP POLICY IF EXISTS` with the same name, so the file is re-runnable. The approved draft used bare `CREATE`, which errors on a second run. End state identical; policies have no dependents.
+
+**What's now complete and where it lives:**
+- Database: A1 + A2 applied. Artefacts committed as [`scripts/sql/2026-09-19-order011-4.2-a1-null-tolerant-policies.sql`](resilientsa-app/scripts/sql/2026-09-19-order011-4.2-a1-null-tolerant-policies.sql:1) and [`…-a2-new-policies.sql`](resilientsa-app/scripts/sql/2026-09-19-order011-4.2-a2-new-policies.sql:1), applied by [`scripts/apply-rls-redesign.ts`](resilientsa-app/scripts/apply-rls-redesign.ts:1) (refuses to run as any role that is not the owner; one transaction; before/after snapshot; assertions). **Not** in `drizzle/migrations/`, which AGENTS.md lists as read-only for review.
+- Code: branch `order-011-4.2-part-b`, commit pushed, building as a Preview. **`main` and Production are untouched and healthy.**
+
+**What's blocked, and on whom:**
+- **Step 4 checkpoint — Captain/Spock.** `POSTGRES_URL_APP` does not exist as a variable anywhere, and I have set nothing. Per the approval, step 4 needs a confirmation back to Spock before the variable is first set on Preview. I am ready for it: the value is the `resilientsa_app` connection string, Sensitive, Preview first.
+- **Then step 5** = the gate (with a real Preview session token and `POSTGRES_URL_APP` in the operator's environment), then **step 6** Production, then step 7 (A3 hardening), step 8 (AGENTS.md checklist → PASS).
+- **Scotty — the typecheck gap** deserves a `SCOTTY_PATTERNS` entry and, better, a real `npm run typecheck` script with an explicit gate, because the current command cannot fail and every agent reading these records believes it can. Flagged rather than fixed: it is build tooling, not this order.
+- Unchanged: **CRIT-001** (Production still `bypassrls=true`; it closes only at step 6 + a passing gate), **MED-007**, and `AGENTS.md`'s POPIA RLS item stays CANNOT BE TICKED until step 6 passes.
+
+**Protocol/pattern checked against:**
+- `AGENTS.md` #1 (build verified before push — zero errors), #2 (no secrets: `POSTGRES_URL_APP` referenced but never set or committed anywhere; nothing written into `.env*`), #3 (executing an approved design, not making a new one — and the one open question was asked, not decided), #4 (no dependency added), #5 (no secret files touched or staged; the probe session token was created and **deleted** in the same command), #10 (this entry).
+- `SCOTTY_PATTERNS.md` **Pattern 003** (the gate's body-leak check), **Pattern 005** (why the pool is built lazily, not at import).
+- The approval's answers 1–8, and order/redesign §5's rollout order **without reordering**: the risky step is last, and rollback remains `unset POSTGRES_URL_APP` + redeploy.
+
+**Anything flagged to Worf or Bones:**
+- **Worf — one awareness item, no new exposure.** The 5 previously deny-all tables now carry policies, three of which are ownership-based in ways worth a second pair of eyes as they take effect (step 4+): `grounders` deliberately has **no INSERT policy** because a `grounders` row confers Grounder capability (ORDER 008 §6) — the omission is load-bearing, not an oversight — and `gifts_profiles` allows same-node **read** but not write, so a Cell Steward can compute aggregates and cannot touch another member's profile. Also: `programme_offerings_owner_write`'s subquery on `grounders` is itself policy-filtered (RLS composes), so relaxing one policy can silently change another's behaviour.
+- **Bones — nothing owed.** No human-facing change in this phase; the 503 is a JSON error body, not UI.
+
+**Next:** (1) **Ready for step 4** — awaiting the Captain's `POSTGRES_URL_APP` for Preview, with a confirmation to Spock first per the checkpoint. (2) Scotty: the typecheck gap. (3) Merge `order-011-4.2-part-b` to `main` once step 4–5 are green.
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*
