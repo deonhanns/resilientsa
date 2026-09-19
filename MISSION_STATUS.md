@@ -1,15 +1,19 @@
 # MISSION STATUS
 **Mission:** ResilientSA
 **Custodian:** Spock
-**Status:** ACTIVE — build phase, core loop live end-to-end on Vercel preview
+**Status:** ACTIVE — build phase. Core loop live end-to-end. **As of 2026-09-19: ORDER 010 closed; ORDER 011 §3 and §4.1 done, §4.2 redesign approved and mid-rollout (steps 1–3 of 8 complete, deliberately stopped at the step-4 checkpoint). Production healthy and unchanged; the §4.2 Part B code is on a branch, deployed to Preview only.**
 
 ---
 
 ## CURRENT PHASE
 
-**Build phase — 8 of 10 Crew Orders substantively built** (007 and 008 both pending Bones review before formal close). As of 2026-09-10, the full core loop works live: a real user can sign up via SMS OTP, complete a Gifts Profile, and see/post to the Trade Exchange — confirmed via live browser testing, not just code review.
+**Build phase — core loop live end-to-end**, and since 2026-09-12 the routing layer underneath it actually works: ORDER 010's catch-all depth fix shipped, which is what made the steward dashboard and the admin member routes reachable at all. A real Playwright login through the UI is re-verified regularly as the live test (most recently 2026-09-19, against both Production and Preview).
 
-**Crew configuration note:** O'Brien (DeepSeek/Kilo Code) has been offline (out of credits) since 2026-08-31, indefinite. Spock has been standing in directly for engineering work since 2026-09-10, per the interim note in `AGENTS.md`. This is a documented deviation, not a silent one — see `OBRIEN_STANDUP.md`'s 2026-09-10 entry for full detail and its own caveats about verification quality during this period.
+**Crew configuration note — CORRECTED 2026-09-19.** This section previously read "O'Brien has been offline (out of credits) since 2026-08-31, indefinite", which stopped being true on **2026-09-11** and was 9 days stale. `AGENTS.md` carries the authoritative note: the interim arrangement is **historical**, O'Brien resumed 2026-09-11, and Spock has since re-entered execution only for schema/connection-layer decisions reserved by Rule #3 (e.g. ORDER 011 §4.2).
+
+**Two verification-integrity findings from this period, recorded because they change how much confidence earlier "verified" claims deserve:**
+1. **CRIT-001 was a false compliance record.** RLS was enabled on every table but enforced on none — the app connected as a role carrying `BYPASSRLS` — from 2026-07-02 onward. The POPIA checklist item for `coop_pii` read PASS while being functionally false.
+2. **`tsc -p api/tsconfig.json --noEmit` checks nothing at all** (confirmed 2026-09-19 with a deliberate canary error; the config-level `TS5107` short-circuits file checking). Every past "api typecheck clean" claim was vacuous, and neither the build nor Vercel typechecks `api/`. See `OBRIEN_STANDUP.md` 2026-09-19.
 
 **Git credentials:** Resolved 2026-07-19, still holding.
 
@@ -27,8 +31,9 @@
 | 006 | Trade Exchange | O'Brien | ✅ COMPLETE (live-verified 2026-09-10, `/api/me` cellId bug fixed) |
 | 007 | Cell Steward Dashboard + Batch Jobs | O'Brien | 🟡 Built, deferred sub-components now shipped (ORDER 007b) — **Bones review still pending, now finally do-able against the live app** |
 | 008 | Community Marketplace | O'Brien | 🟡 Built + schema fix delivered + live-verified (8/8 route checks pass) — **Bones review still pending** |
-| 009 | Notifications (SMS + WhatsApp) | O'Brien | ⬜ QUEUED — blocked behind ORDER 009a (see below) |
-| 010 | Crisis Mode + Resource Map | O'Brien | ⬜ QUEUED — depends on 006 ✅, 009 |
+| 009 | Notifications (SMS + WhatsApp) | O'Brien | ⬜ QUEUED — draft written and marked NOT IN FORCE. Blocked on two Captain/Worf decisions: the POPIA ruling on unsolicited invites, and AT sender-ID registration (long lead time) |
+| 010 | ⚠ **number reused** — Crisis Mode + Resource Map was the plan; the ORDER 010 actually issued was the **catch-all routing depth** fix | O'Brien | ✅ COMPLETE (routing fix) — live-verified 2026-09-12, smoke test 15/15, `760fb60`. **Crisis Mode remains unbuilt and now needs a fresh number — Spock to confirm** |
+| 011 | RLS context never reached queries | Spock (§4.2) / O'Brien | 🟡 **IN PROGRESS** — §3 CONFIRMED live (the cause is `BYPASSRLS`, which FORCE RLS cannot override); §4.1 COMPLETE (31 call sites); §4.3 test added; §4.2 **redesign approved 2026-09-18**, steps 1–3 of 8 done 2026-09-19 — **stopped at the step-4 checkpoint** |
 
 ---
 
@@ -65,7 +70,9 @@ Prototype (McCoy): `design/prototype-v1/ui_kits/resilientsa-app/index.html`
 | Bones review — ORDER 007 StewardDashboard | 🔴 Immediate | Unblocked as of 2026-09-10 (live app now reachable) — not yet done |
 | Bones review — ORDER 008 Marketplace | 🔴 Immediate | Unblocked as of 2026-09-10 — not yet done |
 | ORDER 009a spec session (Node & Cell Formation) | 🔴 Immediate | Not yet spec'd — needs dedicated bridge session |
-| Wire in BottomNav | 🟡 Small, contained | Not started |
+| **ORDER 011 §4.2 rollout step 4** — set `POSTGRES_URL_APP` on Preview | 🔴 Immediate (the one gated checkpoint) | **Awaiting Captain.** Sensitive value required; confirmation to Spock first per the approval. O'Brien ready |
+| **api-typecheck gap** — `tsc -p api/tsconfig.json` checks no files at all without `--ignoreDeprecations` | 🔴 Immediate | Confirmed by canary 2026-09-19. Needs a real `npm run typecheck` gate — flagged to Scotty |
+| Wire in BottomNav | ✅ Resolved 2026-09-10 | Shipped (standup 2026-09-10) |
 | Assign Captain's test user a real `cellId` | 🟡 Quick | Not done — needed to see a populated Trade Exchange feed |
 | AT sender-ID registration (real SMS, not `OTP_DEBUG_LOG`) | 🟡 Should start now, long lead time | Not started — Captain action, SA mobile network lead time is days–weeks |
 | Hardcoded Neon credential in `test-listings-api.ts` | ✅ Resolved 2026-09-10 | Removed from source (swapped to `process.env.DATABASE_URL`); old password already rotated/inert; string remains in git history only |
@@ -98,20 +105,31 @@ Prototype (McCoy): `design/prototype-v1/ui_kits/resilientsa-app/index.html`
 
 ## WORF FLAGS — OPEN
 
-*None Critical/High currently open.* Prior High alert (`2026-08-17-order008-hardcoded-db-url.md`) resolved this session — credential removed from source; already-rotated password remains inert in git history only.
+**CORRECTED 2026-09-19. This section previously read "None Critical/High currently open." It was wrong, and wrong in the most misleading direction.**
+
+| ID | Severity | Finding | Where |
+|---|---|---|---|
+| **CRIT-001** | Critical | RLS enabled but **not enforced** since 2026-07-02 — the app connects as `neondb_owner`, which carries `BYPASSRLS`. Closes only when ORDER 011 §4.2 rollout reaches step 6 and the live gate passes. | [`WORF_ALERTS/2026-09-11-order009a-role-escalation-review.md`](WORF_ALERTS/2026-09-11-order009a-role-escalation-review.md:1) §3 |
+| **CRIT-002** | Critical | `POST /api/auth/request-code` returned Drizzle's `err.message` — SQL **plus bound parameters**, one being the plaintext OTP — to an **unauthenticated** caller. **FIXED, deployed, live-verified A/B** on 2026-09-15. | [`WORF_ALERTS/2026-09-15-live-incident-order011-section42-app-role-breakage.md`](WORF_ALERTS/2026-09-15-live-incident-order011-section42-app-role-breakage.md:1) §3.5 |
+| **CRIT-003** | Critical | §4.2's original rollout made the application completely non-functional, **login included**. Superseded by the approved split-identity redesign. | same alert, and [`ENGINEERING_ESCALATIONS/2026-09-15-order011-section42-app-role-unviable.md`](ENGINEERING_ESCALATIONS/2026-09-15-order011-section42-app-role-unviable.md:1) |
+| **CRIT-004** | Critical | The app resolves `POSTGRES_URL`, not `DATABASE_URL` — misdocumented from the project's start, and the direct cause of the 2026-09-14 confusion. **Doctrine corrected by Spock**, commit `58c1884`. | `AGENTS.md` Rule #2 |
+| **HIGH-005/006** | High | Policies raised `42704` instead of filtering when context was absent; 5 further tables had RLS with **no policy** (deny-all). **Both remediated**: A1 made 20 policies NULL-tolerant, A2 gave the 5 tables real policies (zero-policy tables 5 → 0). | ORDER 011 §4.2 steps 1–2 |
+| **MED-007** | Medium | Two client routes are unroutable by construction, so the Trade Exchange feed can never show real listings and the grounder lookups cannot be live-tested. Needs its own order. | ORDER 010 §5 rule 2 |
+
+***Not*** accepted risk: **CRIT-001**. It is an open Critical finding, not a tolerated one.
 
 ---
 
 ## NEXT
 
-1. Bones review — ORDER 007 StewardDashboard + ORDER 008 Marketplace, against the live app (both finally do-able now that login works)
-2. Design session — spec ORDER 009a (Node & Cell Formation)
-3. Assign Captain's test user a real `cellId`; wire in `BottomNav`
-4. Start AT sender-ID registration in parallel (long lead time — don't wait on the above)
-5. ORDER 009 (Notifications) after 009a lands
-6. ORDER 010 after 009
+1. **ORDER 011 §4.2 step 4** — Captain supplies `POSTGRES_URL_APP` for Preview; then step 5 = the gate (`verify-rls-live.ts`) against Preview, step 6 = Production, step 7 = A3 hardening, step 8 = AGENTS.md POPIA item → PASS and the order closes. **CRIT-001 closes at step 6.**
+2. **Bones live reviews** for ORDER 007 StewardDashboard, ORDER 008 Marketplace and ORDER 009a — all three now *genuinely* testable, unlike the versions reviewed before ORDER 010 made those routes reachable. Note `b3b68c0`'s correction: ORDER 007's dashboard was broken until 2026-09-12.
+3. **Scotty: the api-typecheck gap** — every agent reading these records believes that command can fail. It cannot.
+4. New order for **MED-007** (two unroutable client routes).
+5. `AGENTS.md`-adjacent: confirm whether `POSTGRES_URL_APP` belongs in the Restricted Files list once it exists.
+6. ORDER 009 (Notifications) — needs the POPIA invite ruling + AT sender-ID; then Crisis Mode under a fresh order number.
 
 ---
 
-*Last updated: 2026-09-10 (Spock, interim engineering session)*
-*Next update: on ORDER 009a spec, or on first Bones verdict for 007/008*
+*Last updated: 2026-09-19 (O'Brien — ground-truth refresh; this file was 9 days stale and contained a false "no open Criticals" claim. Spock retains custody; the items marked ⚠ above need Spock's confirmation, not O'Brien's.)*
+*Next update: on ORDER 011 §4.2 step 4, or on the next Bones verdict*

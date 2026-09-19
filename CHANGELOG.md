@@ -3,6 +3,49 @@
 
 ---
 
+## 2026-09-19 — ORDER 010 CLOSED, ORDER 011 §3/§4.1/§4.2-redesign, and a live incident (2026-09-12 → 2026-09-19)
+
+*Consolidated entry, same precedent as the 2026-09-11 backfill: an index of what shipped, not a replacement for the session record. **Full detail lives in [`OBRIEN_STANDUP.md`](OBRIEN_STANDUP.md:1190)** — the 2026-09-12, 09-13, 09-15, 09-18 and 09-19 entries.*
+
+### ORDER 010 — catch-all routing depth ✅ CLOSED
+
+- **Path A refuted on Preview** (two variants): the `functions` glob was not the cause, and the runtime pin is not required at all under Vercel CLI 59.1.3. Nothing was merged from it, since it didn't work
+- **Path B shipped** (merge `760fb60`): the steward catch-all replaced by real nested files — `api/steward/[op]/[cellId].ts` plus `api/admin/members/[userId]/{cell,role}.ts`. **11 functions total**, under the Hobby limit of 12 — the order's own math had assumed 8 and would have come out at 14
+- Logic ported verbatim; `setMemberRole`'s strict positive allowlist preserved
+- Live-verified Preview-first then Production: the six routes 401 unauthenticated / 403 authenticated on Preview, 401 on Production
+- **`scripts/smoke-routes.ts` added** as a standing pre-deploy routing check. Its discriminator is the point: a routed handler always returns JSON, which catches both Vercel's platform 404 page *and* the SPA rewrite answering a bad path with HTML at 200. Negative control must FAIL — it does (0/15 vs the 15/15 on Production)
+- **Two routing rules now documented and encoded:** `[...path]` catch-alls match exactly **one** segment, and they do **not** match depth 0
+- `b3b68c0`'s causal claim corrected in the record: it was necessary but never sufficient, and the steward dashboard stayed broken until `760fb60`
+
+### ORDER 011 — RLS (§3, §4.1, §4.3)
+
+- **§3 confirmed live, and the mechanism was not what the order assumed:** `neondb_owner` carries the **BYPASSRLS** attribute, which overrides every policy and is *not* the exemption `FORCE ROW LEVEL SECURITY` closes. So a dedicated non-owner role is not merely preferred — it is the only viable fix, correcting the order's own §4.2 options
+- **§4.1 complete:** `tx` threaded through `withRLSContext` into **31 call sites across 9 files**, verified by grep rather than `tsc`
+- **§4.3 test added**, including a false PASS caught and fixed: the first version reported PASS on zero rows from an *empty* table. It now probes a non-empty table and exits INCONCLUSIVE (not PASS) when there is nothing to protect
+- `AGENTS.md`'s POPIA RLS checklist item corrected to CANNOT BE TICKED, with the live evidence and the inert window (2026-07-02 → §4.2)
+
+### Live incident — 2026-09-14/15 → CRIT-002 FIXED
+
+- **Production was never affected.** The `DATABASE_URL` switch *and* its rollback were both inert: the API resolves **`POSTGRES_URL`** via `@vercel/postgres`, which contains zero runtime references to `DATABASE_URL`. Confirmed by a real Playwright login: `200 request-code`, `200 verify-code`, `200 /api/me`, `/trade` rendering, `/admin` 200
+- **The genuine breakage was in Preview**, where the new role *was* live: every DB-touching route 500'd **including login**, because all policies called `current_setting()` without `missing_ok` → `42704`. No token → 401 everywhere → "no cell" on trade. That is the reported symptom sequence, and its source was Preview, not Production
+- **CRIT-002 — FIXED, deployed, live-verified A/B.** `POST /api/auth/request-code` returned `err.message`, which embeds the SQL **and its bound parameters** — one being the plaintext OTP — plus a stack trace, to an *unauthenticated* caller. Now returns `{"error":"Internal server error"}`; the SQL prefix is logged server-side with the `params:` tail stripped (Pattern 003's rule, extended from logs to responses)
+- Filed: [`WORF_ALERTS/2026-09-15-live-incident-order011-section42-app-role-breakage.md`](WORF_ALERTS/2026-09-15-live-incident-order011-section42-app-role-breakage.md:1) (CRIT-002/003/004, HIGH-005/006, MED-007) and [`ENGINEERING_ESCALATIONS/2026-09-15-order011-section42-app-role-unviable.md`](ENGINEERING_ESCALATIONS/2026-09-15-order011-section42-app-role-unviable.md:1)
+
+### ORDER 011 §4.2 REDESIGN — approved 2026-09-18, steps 1–3 executed 2026-09-19
+
+- **Approved in full** ([`approval`](CREW_ORDERS/CREW-ORDER-011-section-4.2-REDESIGN-approval.md:1)) — split connection identity, three GUCs, per-table policy reasoning. Spock also corrected `AGENTS.md` Rule #2 (`DATABASE_URL` → `POSTGRES_URL`) at source, commit `58c1884`
+- **Step 1 — A1 applied:** 20 policies made NULL-tolerant. Policy count 23 → 23 and the zero-policy set unchanged, owner reads unchanged — behaviour-neutral confirmed by assertion, not assumed
+- **Step 2 — A2 applied:** +7 policies for the 5 deny-all tables. **Zero-policy tables 5 → 0**
+- **Step 3 — Part B built**, shipped to branch `order-011-4.2-part-b` only, so `main` and Production stay untouched. Fail-closed proven live on Preview: privileged pool unaffected (`/api/me`, `/api/admin/nodes`, `request-code` all 200), node-scoped routes 503
+- **New gate `scripts/verify-rls-live.ts`** — the application-level check §6 called for. Validated in **both** directions: exit 3 INCONCLUSIVE without a session token, exit 1 FAIL with one. It would have failed the 2026-09-14 rollout
+- **Stopped at the step-4 checkpoint.** No environment variable set anywhere; `POSTGRES_URL_APP` does not yet exist as a live variable
+
+**Build:** `tsc -b && vite build` — zero errors, **77 modules**
+
+**Open:** **CRIT-001** (Production still `bypassrls=true` — closes only at rollout step 6 plus a passing gate); rollout step 4 (needs `POSTGRES_URL_APP`, Sensitive, Preview first, Captain); Bones live reviews for ORDER 007 / 008 / 009a, now genuinely testable; **MED-007** (two client routes unroutable by construction); the **api-typecheck gap** (`tsc -p api/tsconfig.json` checks *nothing* without `--ignoreDeprecations`); AT sender-ID registration not started
+
+---
+
 ## 2026-09-11 — CONSOLIDATED BACKFILL: ORDER 008 → ORDER 009a (2026-08-01 → 2026-09-11)
 
 *Backfilled 2026-09-11 as a single consolidated entry, per Captain direction — deliberately **not** backfilled entry-by-entry. This is an index of what shipped, not a replacement for the session record. **Full detail lives in [`OBRIEN_STANDUP.md`](OBRIEN_STANDUP.md:790)** (2026-09-10 pt.1–pt.6, and the 2026-09-11 entries). This entry exists because the changelog had been stale since 2026-07-19.*
