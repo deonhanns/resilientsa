@@ -46,6 +46,9 @@
 //
 // Exits 0 if every route routed, 1 otherwise.
 
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 const BASE = (process.argv[2] ?? 'https://resilientsa.vercel.app').replace(/\/$/, '')
 
 // A cell id and user id that are well-formed and effectively arbitrary: the routes
@@ -54,9 +57,13 @@ const CELL = 'c0000000-0000-0000-0000-000000000001'
 const USER = '70930429-e479-4013-8698-5e9325ef95cb'
 const MATCH = '00000000-0000-0000-0000-000000000009'
 
-type Route = { method: string; path: string; note: string; body?: unknown }
+// EXPORTED DELIBERATELY — CREW-ORDER-011 §4.2 gate ruling §1 (Spock, 2026-09-19).
+// This array IS the client's route inventory and the single source of truth for it.
+// scripts/verify-rls-live.ts imports it rather than authoring a second list, so the
+// routing smoke test and the application gate can never silently diverge again.
+export type Route = { method: string; path: string; note: string; body?: unknown }
 
-const ROUTES: Route[] = [
+export const ROUTES: Route[] = [
   // ── The six routes CREW-ORDER-010 fixed. These are the regression guards. ──
   { method: 'GET', path: `/api/steward/dashboard/${CELL}`, note: 'ORDER 007 dashboard (was platform-404)' },
   { method: 'GET', path: `/api/steward/isolates/${CELL}`, note: 'ORDER 007 isolates (was platform-404)' },
@@ -134,4 +141,14 @@ async function main() {
   console.log('\nOK — every declared route reached its handler.\n')
 }
 
-main()
+// Only run when invoked directly. This module is now imported by scripts/verify-rls-live.ts
+// for its route list, so importing it must NOT execute the smoke test.
+const invokedDirectly =
+  Boolean(process.argv[1]) && path.resolve(process.argv[1] as string) === fileURLToPath(import.meta.url)
+
+if (invokedDirectly) {
+  main().catch((err) => {
+    console.error('\nsmoke-routes failed to run:', err?.message ?? err, '\n')
+    process.exit(1)
+  })
+}
