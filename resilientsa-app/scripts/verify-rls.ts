@@ -120,28 +120,53 @@ async function main() {
   }
   console.log()
 
-  // ── Baseline: is there any data to hide? Literal queries only, no dynamic SQL. ──
-  const baseline = num(rowsOf(await sql`SELECT count(*)::int AS n FROM users`))
-  console.log(`baseline: contextless count of users = ${baseline}`)
+  // ── Assertion 3, REWRITTEN 2026-09-19 per the first A1-revision ruling ──────────
+  //
+  // The old baseline assumed THIS CONNECTION BYPASSES RLS, so a contextless count was
+  // the "there is data to hide" reference. That assumption is false by design now: the
+  // whole point of the application role is that it does NOT bypass. Under it the
+  // contextless count is correctly 0, which cannot distinguish "denied" from "nothing
+  // there" — so the script reported INCONCLUSIVE and could never PASS.
+  //
+  // Two-sided instead, which is STRONGER than the old one-directional test:
+  //   1. VISIBILITY — with a real, known-good context the rows must be VISIBLE.
+  //   2. DENIAL     — with a fabricated context the same read must return NOTHING.
+  //   3. CONTEXTLESS — must now return 0 WITHOUT raising: that is precisely what the
+  //      nullif guards exist for, so a raise here means a guard is missing somewhere.
+  const REAL_NODE = process.env.RLS_TEST_NODE_ID ?? '00000000-0000-0000-0000-000000000001'
+  const REAL_USER = process.env.RLS_TEST_USER_ID ?? '00000000-0000-0000-0000-0000000000aa'
 
-  if (baseline === 0) {
-    console.error('\nINCONCLUSIVE — "users" is empty, so a zero-row result cannot distinguish')
-    console.error('"RLS denied the read" from "there was nothing to read". This is exactly the false')
-    console.error('PASS an earlier version of this script produced against coop_pii.founding_members.')
-    console.error('Create at least one user, then re-run.\n')
-    process.exit(3)
-  }
-
-  // ── The assertion: same read, RLS context pointed at a node that does not exist ──
-  const txRes: any = await sql.transaction([
-    sql`SELECT set_config('app.current_node_id', ${NO_SUCH_NODE}, true)`,
-    sql`SELECT set_config('app.current_role', 'node_admin', true)`,
+  const visTx: any = await sql.transaction([
+    sql`SELECT set_config('app.current_node_id', ${REAL_NODE}, true)`,
+    sql`SELECT set_config('app.current_role', 'member', true)`,
+    sql`SELECT set_config('app.current_user_id', ${REAL_USER}, true)`,
     sql`SELECT count(*)::int AS n FROM users`,
   ])
-  const contexted = num(rowsOf(txRes?.[2]))
+  const visible = num(rowsOf(visTx?.[3]))
 
-  console.log(`probe:    count of users with context = NON-EXISTENT node = ${contexted}`)
-  console.log(`expected: 0   (baseline is ${baseline}, so there IS data to hide)`)
+  const denTx: any = await sql.transaction([
+    sql`SELECT set_config('app.current_node_id', ${NO_SUCH_NODE}, true)`,
+    sql`SELECT set_config('app.current_role', 'member', true)`,
+    sql`SELECT set_config('app.current_user_id', ${REAL_USER}, true)`,
+    sql`SELECT count(*)::int AS n FROM users`,
+  ])
+  const denied = num(rowsOf(denTx?.[3]))
+
+  let contextless: number | null = null
+  let contextlessError: string | null = null
+  try {
+    contextless = num(rowsOf(await sql`SELECT count(*)::int AS n FROM users`))
+  } catch (e: any) {
+    contextlessError = `${e?.code ?? ''} ${e?.message ?? e}`.trim()
+  }
+
+  console.log(`visibility : count(users) with a REAL context (node ${REAL_NODE.slice(0, 8)}…) = ${visible}`)
+  console.log(`denial     : count(users) with a FABRICATED context                        = ${denied}`)
+  console.log(
+    `contextless: count(users) with no context at all                         = ${
+      contextlessError ? `RAISED ${contextlessError}` : contextless
+    }`,
+  )
 
   // ── coop_pii reporting — explicitly flagged when it cannot prove anything ──
   const fm = num(rowsOf(await sql`SELECT count(*)::int AS n FROM coop_pii.founding_members`))
@@ -159,28 +184,51 @@ async function main() {
   }
   console.log()
 
-  if (Number.isNaN(contexted)) {
-    console.error('Could not read the probe count — response shape unexpected.\n')
+  if (Number.isNaN(visible) || Number.isNaN(denied)) {
+    console.error('Could not read a probe count — response shape unexpected.\n')
     process.exit(2)
   }
 
-  if (contexted === 0) {
-    console.log(`✅ PASS — a users read under a non-matching node context returned 0 of ${baseline} rows.`)
-    console.log('   RLS is being ENFORCED for this connection.\n')
-    process.exit(0)
+  // A RAISE on the contextless read means an unguarded uuid cast is present: exactly the
+  // defect the A1 revisions removed. Treat it as a failure, never as a pass.
+  if (contextlessError) {
+    console.error(`❌ FAIL — a contextless read RAISED (${contextlessError}).`)
+    console.error('   With every uuid cast nullif-guarded this must return 0 rows, not raise 22P02.')
+    console.error('   An unguarded cast on a custom GUC is present. See the A1-revision rulings.\n')
+    process.exit(1)
   }
 
-  console.error(`❌ FAIL — ${contexted} of ${baseline} users rows were visible under a node context that`)
-  console.error('   matches NO node. RLS is ENABLED but NOT ENFORCED for this connection.')
-  // Note: this branch is only reachable for a role that does NOT carry BYPASSRLS (that
-  // case exits 4 above). An owner without BYPASSRLS is still exempt from its own policies
-  // unless FORCE ROW LEVEL SECURITY is set — which is why ownership is named as a cause.
-  if (ownsSomething) console.error(`   Cause: we connect as "${who}", which OWNS the table.`)
-  if (!anyForced) console.error('   Cause: no table has FORCE ROW LEVEL SECURITY.')
-  console.error('   The connection identity is the fix, not FORCE RLS alone — a BYPASSRLS role')
-  console.error('   ignores FORCE RLS too. See CREW-ORDER-011 §4.2 redesign, approved 2026-09-18.')
-  console.error('   Do NOT enter real community-member PII until this passes.\n')
-  process.exit(1)
+  if (contextless !== null && contextless > 0) {
+    console.error(`❌ FAIL — ${contextless} users rows were visible with NO context set at all.`)
+    console.error('   A non-bypassing role must see nothing without a context.\n')
+    process.exit(1)
+  }
+
+  if (visible === 0) {
+    console.error('\nINCONCLUSIVE — the REAL context saw 0 users, so a zero result under the')
+    console.error('fabricated context cannot distinguish "RLS denied the read" from "there was')
+    console.error('nothing to read in that node". Point RLS_TEST_NODE_ID at a node that has')
+    console.error('members, then re-run. (Exit 3 is deliberately not a pass.)\n')
+    process.exit(3)
+  }
+
+  if (denied > 0) {
+    console.error(`❌ FAIL — ${denied} users rows were visible under a node context that matches NO node.`)
+    console.error('   RLS is ENABLED but NOT ENFORCED for this connection.')
+    // Reachable only for a role without BYPASSRLS (that case exits 4 above). An owner
+    // without BYPASSRLS is still exempt from its own policies unless FORCE RLS is set.
+    if (ownsSomething) console.error(`   Cause: we connect as "${who}", which OWNS the table.`)
+    if (!anyForced) console.error('   Cause: no table has FORCE ROW LEVEL SECURITY.')
+    console.error('   Do NOT enter real community-member PII until this passes.\n')
+    process.exit(1)
+  }
+
+  console.log('✅ PASS — two-sided enforcement proved for this connection:')
+  console.log(`   • real context      : ${visible} users row(s) visible   (visibility)`)
+  console.log('   • fabricated context: 0                        (denial)')
+  console.log('   • contextless       : 0, without raising       (fail-closed, not fail-loud)')
+  console.log('   RLS is being ENFORCED for this connection.\n')
+  process.exit(0)
 }
 
 main().catch((err) => {

@@ -46,6 +46,11 @@ const APPS: Record<string, string> = {
   // an unset custom GUC arrives as an EMPTY STRING, not NULL — so missing_ok alone did
   // not stop an absent context from raising 22P02 instead of failing closed.
   a1r: 'scripts/sql/2026-09-19-order011-4.2-a1-revision-nullif.sql',
+  // STEP 2b — A1 revision, part 2: the 5 policies A2 introduced. Authority:
+  // CREW-ORDERS/CREW-ORDER-011-section-4.2-A1-revision-part2.md (Spock, 2026-09-19).
+  // A1's arithmetic stopped at its own file's 18 casts; the database held 23. This closes
+  // the remaining 5, applying the identical reasoning to app.current_user_id.
+  a1r2: 'scripts/sql/2026-09-19-order011-4.2-a1-revision-part2.sql',
 }
 
 const which = (process.argv[2] ?? '').toLowerCase()
@@ -71,8 +76,14 @@ type Snap = {
   policyTotal: number
   gucNoMissingOk: number
   gucWithMissingOk: number
-  /** Policy expressions that cast current_setting to uuid with NO nullif guard. */
+  /** Policy expressions that cast current_setting to uuid with NO nullif guard (`::uuid`). */
   uuidCastNoNullif: number
+  /**
+   * Same, but written as `cast(... as uuid)`. Checked separately so a sixth pocket
+   * cannot hide behind different syntax — the ruling asked for the WHOLE set, not just
+   * the two rounds of casts we happen to have found.
+   */
+  castAsUuidNoNullif: number
   roleOnlyPolicies: number
   zeroPolicyTables: string[]
   usersRows: number
@@ -89,7 +100,8 @@ async function snapshot(c: InstanceType<typeof Client>): Promise<Snap> {
       -- ILIKE, not LIKE: PostgreSQL normalises the function name to upper case in
       -- pg_get_expr output ("NULLIF(...)"), so a case-sensitive pattern silently
       -- reported 0 matches and produced a FALSE FAILURE on the first a1r run.
-      count(*) FILTER (WHERE expr LIKE '%::uuid%' AND expr NOT ILIKE '%nullif(%')::int AS uuid_cast_no_nullif
+      count(*) FILTER (WHERE expr LIKE '%::uuid%' AND expr NOT ILIKE '%nullif(%')::int AS uuid_cast_no_nullif,
+      count(*) FILTER (WHERE expr ILIKE '%as uuid%' AND expr NOT ILIKE '%nullif(%')::int AS cast_as_uuid_no_nullif
     FROM (
       SELECT coalesce(pg_get_expr(p.polqual, p.polrelid), '') || ' ' ||
              coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '') AS expr
@@ -116,6 +128,7 @@ async function snapshot(c: InstanceType<typeof Client>): Promise<Snap> {
     gucNoMissingOk: pol.rows[0].guc_no_missing_ok,
     gucWithMissingOk: pol.rows[0].guc_with_missing_ok,
     uuidCastNoNullif: pol.rows[0].uuid_cast_no_nullif,
+    castAsUuidNoNullif: pol.rows[0].cast_as_uuid_no_nullif,
     roleOnlyPolicies: 0,
     zeroPolicyTables: zero.rows.map((r: any) => r.t),
     usersRows: u.rows[0].n,
@@ -129,7 +142,8 @@ function show(label: string, s: Snap) {
   console.log(`  total policies             : ${s.policyTotal}`)
   console.log(`  GUC policies WITHOUT missing_ok : ${s.gucNoMissingOk}`)
   console.log(`  GUC policies WITH missing_ok    : ${s.gucWithMissingOk}`)
-  console.log(`  uuid casts WITHOUT nullif guard : ${s.uuidCastNoNullif}`)
+  console.log(`  uuid casts WITHOUT nullif guard : ${s.uuidCastNoNullif}  (::uuid form)`)
+  console.log(`  cast-as-uuid WITHOUT nullif     : ${s.castAsUuidNoNullif}  (cast(... as uuid) form)`)
   console.log(`  RLS-enabled, ZERO policies : ${s.zeroPolicyTables.length}${s.zeroPolicyTables.length ? ' -> ' + s.zeroPolicyTables.join(', ') : ' -> (none)'}`)
   console.log(`  contextless count users    : ${s.usersRows}`)
   console.log(`  contextless count listings : ${s.listingsRows}`)
@@ -183,13 +197,17 @@ async function main() {
       if (after.zeroPolicyTables.length !== before.zeroPolicyTables.length)
         problems.push('the zero-policy table set changed (A1 must not affect it)')
     }
-    if (which === 'a1r') {
+    if (which === 'a1r' || which === 'a1r2') {
+      // The ruling's requirement, verbatim: zero unguarded uuid casts on any custom GUC,
+      // across EVERY policy in both schemas — not merely the ones this round touched.
       if (after.uuidCastNoNullif !== 0)
         problems.push(`${after.uuidCastNoNullif} policy expression(s) still cast to uuid with no nullif guard`)
-      if (after.policyTotal !== before.policyTotal)
+      if (after.castAsUuidNoNullif !== 0)
+        problems.push(`${after.castAsUuidNoNullif} policy expression(s) use cast(... as uuid) with no nullif guard`)
+      if (which === 'a1r' && after.policyTotal !== before.policyTotal)
         problems.push(`policy count changed ${before.policyTotal} -> ${after.policyTotal} (a1r must only ALTER, never add/drop)`)
       if (after.zeroPolicyTables.length !== before.zeroPolicyTables.length)
-        problems.push('the zero-policy table set changed (a1r must not affect it)')
+        problems.push('the zero-policy table set changed')
     }
     if (which === 'a2') {
       if (after.zeroPolicyTables.length !== 0)

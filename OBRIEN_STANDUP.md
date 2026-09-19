@@ -959,6 +959,39 @@ Same class of defect, same fix shape (`nullif(..., '')`), and the two `current_u
 
 ---
 
+### 2026-09-19 (cont. 5) — A1-revision part 2 applied, assertion 3 rewritten, **step 5 PASSES twice (exit 0)** — and a workspace corruption caught on the way in
+
+**Ruling applied verbatim.** `CREW-ORDER-011-section-4.2-A1-revision-part2.md` → `scripts/sql/2026-09-19-order011-4.2-a1-revision-part2.sql` (5 policies, DROP + CREATE, `nullif(..., '')` applied to both the `app.current_node_id` **and** the `app.current_user_id` casts). Applied through the same applier pattern (`a1r2` step added), owner-only guard intact.
+
+**Whole-set re-assertion, per part 2 §2 — the entire set, not just these 23.** The applier's metric counts every policy expression in both schemas:
+
+| metric | before | after |
+|---|---|---|
+| `::uuid` casts WITHOUT a `nullif` guard | 5 | **0** |
+| `cast(... as uuid)` WITHOUT a `nullif` guard | 0 | **0** |
+| total policies | 30 | 30 |
+
+`ALL PASS — A1R2 applied, behaviour unchanged for the current role.` The `ILIKE` correction from part 1 is in the metric: PostgreSQL normalises the function name to upper case inside `pg_get_expr`, so a case-sensitive `LIKE '%nullif(%'` reports false failures — that was my own metric error, caught and fixed in the previous session.
+
+**Assertion 3 rewritten to the two-sided form** (visibility-then-denial), replacing the baseline whose premise assumed this connection bypasses RLS. Standalone run against `resilientsa_app`: **exit 0** — role `resilientsa_app (superuser=false, bypassrls=false)`; `count(users)` with a **real** context = **10**; with a **fabricated** context = **0**; with **no** context at all = **0, without raising**. That last figure is the entire point of part 2 — the fail-closed path is now *silent*, rather than the flaky `22P02` 500 it was.
+
+**Step 5 run twice**, per part 2 §4's instruction not to treat a single pass as sufficient evidence given the per-connection intermittency found in part 1: **GATE EXIT CODE 0 on both runs.** All three assertions PASS — routing/health, no unexpected 5xx across the full route set, DB enforcement + identity. The only item observed was the already-filed marketplace browse 500 (`CREW-ORDER-012-DRAFT-marketplace-browse-500.md`), tracked and explicitly non-blocking per the gate-fixes ruling §4.
+
+**⚑ WORKSPACE CORRUPTION — caught before committing, and it pointed in two directions at once.** On opening this session, HEAD was on `main` with the *entire* Part B set sitting staged, and the worktree was a mixture:
+
+- **5 route handlers** — `admin/members/[userId]/cell.ts`, `admin/members/[userId]/role.ts`, `listings/[...path].ts`, `matches/[...path].ts`, `trade-completions/[match_id]/confirm-fairness.ts` — had Part B **stripped**: worktree content byte-identical to `main`, i.e. no `withAppConnection` wrapper and `withRLSContext` back to three arguments with `userId` gone.
+- **Both scripts** were the exact opposite — **ahead** of the commit: the `a1r2` step and the assertion-3 rewrite existed *only* in the worktree, not in `a1bd511`.
+
+So neither obvious command was safe. `git commit` would have committed the stale scripts and lost the `a1r2` step and the assertion-3 rewrite. `git add -A` would have committed the stripped handlers. **The second is the dangerous one:** `withRLSContext(nodeId, role, fn)` passes `fn` where `userId` belongs, so those five routes would have shipped to `main` — and therefore to Production — mis-threaded, having also lost the 503 fail-closed wrapper.
+
+I am deliberately not naming a cause. The reflog's last entry is the merge that left HEAD at `a1bd511`, while `git branch --show-current` reported `main` — those two records disagree, so the mechanism is unidentified rather than merely unexplained, and I would rather record that than invent a theory. What I could do was recover deterministically and then verify: saved the two forward scripts to `/tmp` with recorded SHA-256s, `git reset --hard main`, checked out the branch (Part B fully intact at `a1bd511`), restored the scripts, then re-asserted the five handlers by inspection — all five carry `withAppConnection`, and all 12 four-argument `withRLSContext` call sites are present again. I also confirmed `bc7f343` (the pushed tip Preview actually built) is **identical** to `a1bd511` across `api/` and `scripts/`, so the two green gate runs tested exactly the code this branch now holds.
+
+**Verification before commit.** `npm run build` (`tsc -b && vite build`) — exit 0, zero errors. Separately, `tsc -p api/tsconfig.json --noEmit --ignoreDeprecations 6.0` — the flag gap I flagged to Scotty — now genuinely does check `api/`: **28 errors, all `TS6059` `rootDir` config noise, zero real type errors.** So Part B typechecks clean under `strict: true`, and the api-typecheck defect is confined to that tsconfig (`include: ["./**/*.ts"]` against imports reaching into `src/db/schema/`), pre-existing and untouched by this work.
+
+**State:** the database carries A1 + A2 + A1-revision (18) + A1-revision part 2 (5) — **zero unguarded `::uuid` casts on any custom GUC, in both schemas**. Branch `order-011-4.2-part-b` carries all of it plus the tooling. Preview is healthy with `POSTGRES_URL_APP` set. **Production is untouched and `POSTGRES_URL_APP` is NOT set on Production.** Gate green twice, so per part 2 §4 the merge to `main` and the step-6 proposal are authorised.
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*
