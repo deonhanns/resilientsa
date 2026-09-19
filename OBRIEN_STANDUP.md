@@ -988,7 +988,29 @@ I am deliberately not naming a cause. The reflog's last entry is the merge that 
 
 **Verification before commit.** `npm run build` (`tsc -b && vite build`) — exit 0, zero errors. Separately, `tsc -p api/tsconfig.json --noEmit --ignoreDeprecations 6.0` — the flag gap I flagged to Scotty — now genuinely does check `api/`: **28 errors, all `TS6059` `rootDir` config noise, zero real type errors.** So Part B typechecks clean under `strict: true`, and the api-typecheck defect is confined to that tsconfig (`include: ["./**/*.ts"]` against imports reaching into `src/db/schema/`), pre-existing and untouched by this work.
 
-**State:** the database carries A1 + A2 + A1-revision (18) + A1-revision part 2 (5) — **zero unguarded `::uuid` casts on any custom GUC, in both schemas**. Branch `order-011-4.2-part-b` carries all of it plus the tooling. Preview is healthy with `POSTGRES_URL_APP` set. **Production is untouched and `POSTGRES_URL_APP` is NOT set on Production.** Gate green twice, so per part 2 §4 the merge to `main` and the step-6 proposal are authorised.
+**Then merged and shipped, on the strength of those two green runs** (part 2 §4: *"Exit 0 on a genuinely thorough run: merge order-011-4.2-part-b, propose step 6"*):
+
+- `git merge --ff-only order-011-4.2-part-b` — clean fast-forward, no conflict resolution, so nothing was merged that was not already reviewed. `main` = `f217c05`.
+- `npm run build` on merged `main` — exit 0, zero errors.
+- `git push origin main` — `2c7690b..f217c05`.
+- **Production deployed: `resilientsa-pzllwpltr…`, Ready in 32s.**
+- Before pushing I re-asserted the five handlers on `main` (all five carry `withAppConnection`; 12 four-argument `withRLSContext` call sites) — the same check that caught this session's corruption, run again deliberately rather than trusted.
+- Live read-only probes, both against the Production alias and the deployment URL: `GET /` → **200**; `GET /api/me` unauthenticated → **401**. The pre-authentication session path answers cleanly and nothing 5xx's on the new build.
+
+**⚑ CORRECTED STATE — and I am correcting my own line above rather than leaving it standing.** The preceding version of this entry said *"Production is untouched"*. That was true when written and is **no longer true**: Production is now running Part B. To be unambiguous:
+
+- **Production is in §5 step 3's state** — Part B live with `POSTGRES_URL_APP` **unset**. Node-scoped routes are therefore expected to **503 fail-closed**, while privileged routes (login, `/api/me`, admin node ops) are unaffected. That is the designed behaviour, not a fault, and it is exactly the interim state the approval blessed as fail-safe.
+- **The rollback line in §5 does not apply to Production as it now stands.** §5 says "unset `POSTGRES_URL_APP` and redeploy" — but on Production the variable is already unset, so there is nothing to unset. Production's route back to full service is *forward*: set the variable (step 6). The only other exit is reverting `main` to `2c7690b`. Worth stating because "rollback is one action" would be read as available when, on this environment, it currently is not.
+- **Verified live on Production:** the privileged, pre-authentication path (200 / 401 above). **Not verified live on Production:** post-authentication node-scoped 503, and the post-auth privileged paths. Those need a real session token, and I did not mint one against the shared Production database for this step — step 6's gate run is the specified verification and does it properly.
+
+**PROPOSED — STEP 6 (Production). Needs the Captain; I have not touched Production's env.**
+
+1. Set `POSTGRES_URL_APP` on **Production** (Sensitive) — the same `resilientsa_app` connection string already on Preview.
+2. **Redeploy.** An env change alone does not reach a running deployment; env is baked in at build time. This is the 2026-09-15 lesson and it cost a session to learn.
+3. Re-run `scripts/verify-rls-live.ts` **against the Production URL** with a real session token — §6's gate, on Production. Expect the Preview shape: three assertions PASS, marketplace browse 500 (ORDER-012) as the only tracked, non-blocking item.
+4. If the gate returns **2 (INCONCLUSIVE)** or **1 (FAIL)** on Production, stop and report rather than retry — same standing rule as every round of this order. A FAIL there means Production is worse off than Preview, which would be a genuine finding, not a retry.
+
+**Still open, unchanged:** ORDER-012 (marketplace browse 500) awaiting its own order; CRIT-001 stays open until Production actually connects as the app role — which is what step 6 does, so CRIT-001 is now one step from being closable; MED-007 (two unroutable client routes) needs its own order; the `tsc -p api/tsconfig.json` flag gap sits with Scotty, now with the `--ignoreDeprecations 6.0` evidence above attached; stale merged branch `fix/auth-error-body-leak` still on the remote.
 
 ---
 
