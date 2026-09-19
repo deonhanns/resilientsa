@@ -830,6 +830,51 @@ A stray `on ` with an empty condition immediately before `where` — a malformed
 
 ---
 
+---
+
+### 2026-09-19 (cont. 2) — Gate fixes landed and validated per the ruling. Step 5 still blocked: the credential never arrived.
+
+**Read the ruling in full** ([`CREW-ORDER-011-section-4.2-gate-fixes-ruling.md`](CREW_ORDERS/CREW-ORDER-011-section-4.2-gate-fixes-ruling.md:1)) before touching anything. Both fixes are in, and both are **validated by evidence**, not asserted.
+
+**§1 Coverage — fixed by reuse, not a second list.** `smoke-routes.ts` now exports its `ROUTES` array and guards its CLI body so importing it does not execute the smoke test (verified: standalone run still reports 15/15, exit 0). `verify-rls-live.ts` imports that array. The gate now prints `probes 15 routes, imported from scripts/smoke-routes.ts`, and the previous hand-picked four-route list is gone. **The fix demonstrably closes the blind spot:** in the same run that used to report `authenticated 5xx: PASS` over a live 500, the gate now prints
+
+```
+  KNOW  500  GET /api/marketplace/offerings   auth
+```
+
+— the defect is *seen*, named, and referenced to its own order.
+
+**§2 Verdict mapping — three states.** `0` PASS, `1` FAIL, `2` INCONCLUSIVE, with `verify-rls.ts`'s REFUSED/exit-4 folded in as one instance of INCONCLUSIVE rather than read as a failure. Verified live: the REFUSED case now yields **exit 2** with the verdict line `INCONCLUSIVE — REFUSED: the connection bypasses RLS, so nothing was proven`. FAIL is reserved for a definite enforcement failure or an **unexpected** 5xx.
+
+**The known-defect registry, and its self-retiring property.** The marketplace bug is listed in `KNOWN_DEFECTS` with an issue reference and a stated reason, so it reports as `KNOW` and cannot block this order — while a route that stops failing while probed authenticated is reported as a **STALE EXEMPTION that must be removed**, so the exemption cannot outlive the bug and mask a future regression. Closing ORDER-012 therefore *forces* its own removal.
+
+**Non-destructive by construction, and that was verified rather than assumed.** The shared route list contains mutating endpoints and this gate holds a valid token, so GET routes are probed authenticated and non-GET routes unauthenticated. Before relying on that I confirmed each of the three mutating handlers (`admin/members/[userId]/{cell,role}.ts`, `trade-completions/[match_id]/confirm-fairness.ts`) calls `getSession()` and returns 401 **before** any `tx.insert`/`tx.update`. A gate that mutates production data in order to test itself is not a gate anyone should run; the trade-off — non-GET routes don't exercise the app pool — is stated in the script's own header, and the GET routes do cover it.
+
+**Two mistakes of my own, both caught, both recorded:**
+1. **I applied the gate edits while checked out on `main`**, where branch-only scripts don't exist. I then ran the gate from `main` and got an `ERR_MODULE_NOT_FOUND` that surfaced as a bare `exit 1` — the *second* time this session I have done that, and the first time my own grep filter turned it into a reported `exit 0`. I moved both edits onto the branch and cleaned `main`. **Mitigation for whoever is next: branch-only scripts cannot be trusted to run from `main`, and every result must be read unfiltered.** It cost two turns, not a wrong outcome — but only because it was caught.
+2. **My stale-exemption check was initially wrong** — it recorded exemptions by *presence* in the route list rather than by an *observed failure*, so it could never fire. Caught by the no-token dry run. Now: `stale` requires the route to have been probed authenticated **and** not to have 5xxed, so a no-token run cannot raise a false stale alarm.
+
+**§4 — filed, per the ruling.**
+- [`CREW-ORDERS/CREW-ORDER-012-DRAFT-marketplace-browse-500.md`](CREW_ORDERS/CREW-ORDER-012-DRAFT-marketplace-browse-500.md:1) — **DRAFT, NOT IN FORCE** (Crew Orders are Spock's artefact). Root cause located precisely: [`api/marketplace/[...path].ts:100`](resilientsa-app/api/marketplace/[...path].ts:100) passes the join predicate as the **table** argument and an empty `sql` template as the join **condition**, so Drizzle emits a stray `on` before `where` and Postgres raises `42601` at parse time. It sits behind `if (offeringIds.length > 0)`, so an empty database returns `[]` at 200 and hides it — **it fails from the first offering onward, which is why it has never been seen.** Two acceptable fixes and the verification requirements are in the draft.
+- [`BONES_VERDICT.md`](BONES_VERDICT.md:334) — annotated addendum (attributed, bones' verdict unaltered) that ORDER 008's `CONDITIONAL PASS` could not have been judged against a working data path, because the screen has never had one.
+- Both cherry-picked to `main` (`50ef69e`) as well as committed on the branch, so Spock and Bones see them without waiting for the merge.
+
+**Step 5 was NOT re-attempted to a verdict, and nothing was merged.** The Captain's instruction was to confirm readability of `POSTGRES_URL_APP` in `.env.local` before re-attempting. It was **not present**, and after polling it four times across ~2 minutes it still was not. So:
+- Assertion 3 cannot execute ⇒ the gate's best possible result today is **exit 2 INCONCLUSIVE**, verified.
+- Step 5 requires **exit 0 PASS** ⇒ not reached ⇒ **no merge to `main`**, and **step 6 is not proposed**. `main` carries only the docs (`50ef69e`); the Part B code remains on `order-011-4.2-part-b` (`c072b5a`).
+- Everything else is ready: the moment the string is in `.env.local`, step 5 is a single command against `resilientsa-r3m8bbmjm`, and on exit 0 the merge and the step-6 proposal follow immediately.
+
+**Protocol/pattern checked against:** `AGENTS.md` #1 (build clean — `✓ built`, zero errors), #2/#5 (**the secret was never obtained, read, or printed — presence only, by key name**), #3 (no schema or connection change; both fixes are to a test script, and the two gate defects were escalated for ruling rather than quietly patched), #4 (no dependency), #10 (this entry) · `SCOTTY_PATTERNS.md` 003 (the retained parameter-leak guard in the matrix) and 005 (why the app pool is built lazily) · the ruling §1–§4, applied as written.
+
+**Anything flagged to Worf or Bones:**
+- **Worf — no new exposure.** The gate's CRIT-002 regression guard is retained: any 5xx body containing `params:` now also fails the gate, so the leak fixed on 2026-09-15 cannot return unnoticed.
+- **Bones — the ORDER 008 addendum above is the one item owed, and it is filed.**
+- **Both — a pattern worth generalising:** ORDER-012 was found only because step 5 made me probe the *whole* client route set instead of the routes I had reason to suspect. Two other defects this period share its shape (`MED-007`'s unroutable routes; `b3b68c0`'s masked symptom). **"Probe everything the client actually calls, from one shared list"** is the general rule, and it is now encoded in the gate rather than left as a habit.
+
+**Next:** (1) **Captain — the `resilientsa_app` connection string into `resilientsa-app/.env.local` under `POSTGRES_URL_APP`**; then I re-run step 5 and, on exit 0, merge and propose step 6. (2) **Spock — issue ORDER-012** from the draft. (3) Unchanged: CRIT-001 stays open until Production connects as the app role (step 6 + a passing gate), and MED-007 still needs its own order.
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*
