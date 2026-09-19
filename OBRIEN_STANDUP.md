@@ -875,6 +875,53 @@ A stray `on ` with an empty condition immediately before `where` — a malformed
 
 ---
 
+---
+
+### 2026-09-19 (cont. 3) — Step 5 re-attempted with the credential. Gate returns **2 — INCONCLUSIVE**. Enforcement proven for the first time; a latent schema hazard found.
+
+**Gate result: exit 2 — INCONCLUSIVE.** Not 0, not 1. **No merge; step 6 not proposed.** `POSTGRES_URL_APP` was read successfully from `.env.local` — presence confirmed, value never printed — and assertion 3 connected as **`resilientsa_app`, `bypassrls=false`** for the first time in this project's history.
+
+**Assertion 3's new failure mode is its *premise*, not enforcement.** `verify-rls.ts` assumes the connection bypasses RLS, so a *contextless* count is the "there is data to hide" baseline. As the app role the contextless count is **correctly 0** — so the test cannot distinguish "denied" from "nothing there" and returns INCONCLUSIVE (exit 3). That is the script refusing a vacuous pass, exactly as §4.3's correction intended. But it means **assertion 3 can never pass as written now that the connection is the app role** — and step 5 requires exit 0.
+
+**⚑ Enforcement is now PROVEN, two-sidedly — the first positive evidence since 2026-07-02.** As the app role:
+
+```
+  context = the REAL node        count(users) = 10   <-- data IS reachable when context is right
+  context = a NON-EXISTENT node  count(users) =  0   <-- denied, with data present
+```
+
+That is what CRIT-001 has been about for ten weeks, and until today it could not be demonstrated at all, because `neondb_owner` carries `BYPASSRLS` and never evaluates a policy. It is also a stronger test than the old one-sided baseline: it proves *visibility with the right context* as well as *denial with the wrong one*.
+
+**⚑ NEW FINDING, needs Spock — the `missing_ok` rewrite does not actually cover the absent-context case on this platform.** On a connection with no context set:
+
+```
+  app.current_node_id  is_null=false  value=''          <-- EMPTY STRING, not NULL
+  contextless count(users) THREW: 22P02 invalid input syntax for type uuid: ""
+```
+
+`current_setting(name, true)` is returning **`''`** here, not NULL, for a custom GUC that was never set. `missing_ok` only helps when the setting is *missing*; present-but-empty falls straight through to `''::uuid` and raises. So **A1 makes an absent context fail closed by filtering only when the value is NULL — on Neon's pooler it is not**, and the failure mode is a hard `22P02` instead. Reproduced on **both** the `pg`/TCP and `@neondatabase/serverless` drivers. Ruled out as causes: role defaults (`rolconfig` is `null`), database/role settings (`pg_db_role_setting` is empty), and the connection string (its only query params are `sslmode` and `channel_binding` — no `options`, no GUC injection). Left as a platform/pooler behaviour for Spock and Uhura.
+
+**Recommended, NOT applied (schema — Rule #3):**
+```sql
+-- treat "unset" and "set to empty" identically, so an absent context is a clean denial
+nullif(current_setting('app.current_node_id', true), '')::uuid
+```
+and, for assertion 3, a baseline that fits a non-bypassing role: establish **visibility with a valid node context** (>0) and then assert **denial with a non-existent one** (==0). Both are changes to the approved design or to milestone 4's verification method, so they are Spock's to rule on, not mine to quietly fix.
+
+**Live risk today: low, but latent-by-construction.** Every node-scoped route sets its context inside `withRLSContext`, so the empty-string path isn't reached in normal operation; the privileged paths (session, otp, gifts-nudge, admin node ops) run as the owner, which bypasses RLS entirely so no policy is ever evaluated. The hazard is that **any future app-pool query that forgets its context 500s instead of denying** — the same class as the 2026-09-14 failure, and worth closing before real member data is in play.
+
+**One thing the ruling got exactly right, demonstrated on its first real use.** Under the old two-state scheme this run would have reported **FAIL — "RLS is not being enforced"**, when the truth is "the test's premise no longer holds and nothing was proven". §2's INCONCLUSIVE state kept a correct-but-uninformative result from being read as a defect. It also kept me from merging on a result I had not actually verified.
+
+**Protocol/pattern checked against:** `AGENTS.md` #2/#5 (**the credential was read only by the scripts, never printed; only its *shape* — role/host/query-param keys — was inspected, which is how the `options` source was ruled out**), **#3 (no schema or methodology change made — both recommendations are escalated)**, #1 (build clean), #10 (this entry) · the ruling §1–§3 · and the standing instruction: *"If it reaches 1 (FAIL) on anything besides the already-known marketplace bug, stop and report."* It reached **2**, which is neither, so I stopped and reported rather than treating "not a fail" as permission to proceed.
+
+**Anything flagged to Worf or Bones:**
+- **Worf — one item, latent rather than live.** The empty-string-context behaviour means the app-role's denial path is not uniformly a *denial*: on this platform an absent context can raise instead. No PII exposure (an error is not a leak, and the privileged paths that touch `coop_pii` and session data are owner-connected), but the fail-closed property the redesign promised is not yet fully true. Worth a Worf line in whatever ruling follows.
+- **Bones — nothing new.**
+
+**Next:** (1) **Spock — rule on the `nullif(..., '')` policy form and on assertion 3's baseline**, after which step 5 should be able to reach exit 0 and the merge can happen. (2) **Spock — issue ORDER-012** from the draft. (3) Unchanged: CRIT-001 stays open until Production connects as the app role (step 6 + a passing gate); MED-007 still needs its own order. Preview `r3m8bbmjm` remains as the working app-role deployment; Production untouched and healthy.
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*
