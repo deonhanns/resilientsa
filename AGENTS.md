@@ -86,6 +86,29 @@ are being modified. Review only — do not edit or build.
 [ ] Founding member PII (full_name, surname, id_number, address, email) stored as bytea
 [ ] FoundingMember table lives in coop_pii schema, not public
 [ ] RLS enabled on every table in both public and coop_pii schemas
+[x] **✅ coop_pii access restricted to node_admin role only via RLS policy — TICKED 2026-09-20. NOW TRUE.**
+      Verified live 2026-09-20, 01:28–01:31 SAST. (The session that produced it began on 2026-09-19 SAST,
+      so both dates appear across the surrounding records — this tick is the 2026-09-20 one.)
+      Evidence: `scripts/verify-rls-live.ts` run **twice** against **Production**
+      (`resilientsa-i4waf65ve…`, the build that `POSTGRES_URL_APP` landed in) — **exit 0 on both runs**:
+      - routing/health (smoke-routes)     : PASS — 15/15 declared routes reached their handlers
+      - no unexpected 5xx, full route set : PASS — node-scoped authenticated GETs returned **200/403, not
+                                            503**, which is the runtime proof the app pool is live (a
+                                            dashboard variable alone proves nothing; env is baked at build
+                                            time — the 2026-09-15 lesson)
+      - DB enforcement + identity         : PASS — `verify-rls.ts` as `resilientsa_app`
+                                            (superuser=false, **bypassrls=false**): real context = 10 users
+                                            visible, fabricated context = 0, **no context = 0 without raising**
+      This is the *mechanism*: RLS actually enforced on a non-owner, non-BYPASSRLS connection. That
+      condition was false from ORDER 003 (2026-07-02) until this run, and its absence is what allowed the
+      2026-09-14 incident to happen with every existing check green.
+      **⚠️ ONE RESIDUAL CAVEAT, deliberately left visible rather than ticked away:** `coop_pii` is still
+      EMPTY pre-pilot (`founding_members` = 0, `cooperatives` = 0), so enforcement *on coop_pii rows* is
+      not yet demonstrable with data. This tick asserts the enforcement mechanism, and the `coop_pii`
+      policies are now subject to it — it is **not** a rows-level proof for `coop_pii`. Re-verify with real
+      data before the tick is relied on for a cooperative's PII.
+
+      **History — why this was unticked, and how it stayed hidden for ten weeks (retained verbatim):**
 [ ] **⚠️ coop_pii access restricted to node_admin role only via RLS policy — CANNOT BE TICKED. NOT CURRENTLY TRUE.**
       Verified live 2026-09-13 (`CREW-ORDER-011` §3): RLS is ENABLED on every table but **NOT ENFORCED**.
       - the application connects as `neondb_owner`, which **owns** every RLS-bearing table;
@@ -102,6 +125,8 @@ are being modified. Review only — do not edit or build.
       drafted and awaiting Spock's approval: `CREW_ORDERS/CREW-ORDER-011-section-4.2-REDESIGN-draft.md`.
       This checklist item stays CANNOT BE TICKED until that redesign rolls out and its live gate
       (`verify-rls-live.ts`) passes against Production.
+      **Resolved 2026-09-20:** that redesign rolled out in full (steps 1–6) and its live gate passed against
+      Production twice. See the ticked item above.
 [ ] No console.log() or equivalent logs PII values
 [ ] API responses never return raw encrypted bytes to the client
 [ ] Founding member data purged on registration confirmation, not retained

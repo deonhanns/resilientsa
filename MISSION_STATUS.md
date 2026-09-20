@@ -1,7 +1,7 @@
 # MISSION STATUS
 **Mission:** ResilientSA
 **Custodian:** Spock
-**Status:** ACTIVE — build phase. Core loop live end-to-end. **As of 2026-09-19: ORDER 010 closed; ORDER 011 §3 and §4.1 done, §4.2 redesign approved and mid-rollout (steps 1–3 of 8 complete, deliberately stopped at the step-4 checkpoint). Production healthy and unchanged; the §4.2 Part B code is on a branch, deployed to Preview only.**
+**Status:** ACTIVE — build phase. Core loop live end-to-end. **As of 2026-09-20: ORDER 011 §4.2 is COMPLETE and CRIT-001 is CLOSED — RLS is enforced on the application's connection identity in Production, proven by the live application gate (`verify-rls-live.ts`, exit 0 on two runs). `POSTGRES_URL_APP` is set on both Preview and Production. ORDER 010 closed. Production healthy.**
 
 ---
 
@@ -12,7 +12,7 @@
 **Crew configuration note — CORRECTED 2026-09-19.** This section previously read "O'Brien has been offline (out of credits) since 2026-08-31, indefinite", which stopped being true on **2026-09-11** and was 9 days stale. `AGENTS.md` carries the authoritative note: the interim arrangement is **historical**, O'Brien resumed 2026-09-11, and Spock has since re-entered execution only for schema/connection-layer decisions reserved by Rule #3 (e.g. ORDER 011 §4.2).
 
 **Two verification-integrity findings from this period, recorded because they change how much confidence earlier "verified" claims deserve:**
-1. **CRIT-001 was a false compliance record.** RLS was enabled on every table but enforced on none — the app connected as a role carrying `BYPASSRLS` — from 2026-07-02 onward. The POPIA checklist item for `coop_pii` read PASS while being functionally false.
+1. **CRIT-001 was a false compliance record.** RLS was enabled on every table but enforced on none — the app connected as a role carrying `BYPASSRLS` — from 2026-07-02 onward. The POPIA checklist item for `coop_pii` read PASS while being functionally false. **CLOSED 2026-09-20:** the enforcement mechanism is now verified live and enforced; the one part that is *not* yet provable — `coop_pii` rows, because those tables are still empty pre-pilot — is stated explicitly in `AGENTS.md` rather than ticked away.
 2. **`tsc -p api/tsconfig.json --noEmit` checks nothing at all** (confirmed 2026-09-19 with a deliberate canary error; the config-level `TS5107` short-circuits file checking). Every past "api typecheck clean" claim was vacuous, and neither the build nor Vercel typechecks `api/`. See `OBRIEN_STANDUP.md` 2026-09-19.
 
 **Git credentials:** Resolved 2026-07-19, still holding.
@@ -33,7 +33,7 @@
 | 008 | Community Marketplace | O'Brien | 🟡 Built + schema fix delivered + live-verified (8/8 route checks pass) — **Bones review still pending** |
 | 009 | Notifications (SMS + WhatsApp) | O'Brien | ⬜ QUEUED — draft written and marked NOT IN FORCE. Blocked on two Captain/Worf decisions: the POPIA ruling on unsolicited invites, and AT sender-ID registration (long lead time) |
 | 010 | ⚠ **number reused** — Crisis Mode + Resource Map was the plan; the ORDER 010 actually issued was the **catch-all routing depth** fix | O'Brien | ✅ COMPLETE (routing fix) — live-verified 2026-09-12, smoke test 15/15, `760fb60`. **Crisis Mode remains unbuilt and now needs a fresh number — Spock to confirm** |
-| 011 | RLS context never reached queries | Spock (§4.2) / O'Brien | 🟡 **IN PROGRESS** — §3 CONFIRMED live (the cause is `BYPASSRLS`, which FORCE RLS cannot override); §4.1 COMPLETE (31 call sites); §4.3 test added; §4.2 **redesign approved 2026-09-18**, steps 1–3 of 8 done 2026-09-19 — **stopped at the step-4 checkpoint** |
+| 011 | RLS context never reached queries | Spock (§4.2) / O'Brien | ✅ **COMPLETE 2026-09-20** — §3 cause confirmed live (`BYPASSRLS`, which FORCE RLS cannot override); §4.1 fixed (31 call sites); §4.3 test rewritten two-sided; §4.2 redesign approved 2026-09-18, all six rollout steps executed and verified, live application gate **exit 0 twice against Production**. Step 7 (A3 drops) is deferred hardening; step 8 close-out done. **CRIT-001 CLOSED** |
 
 ---
 
@@ -70,8 +70,9 @@ Prototype (McCoy): `design/prototype-v1/ui_kits/resilientsa-app/index.html`
 | Bones review — ORDER 007 StewardDashboard | 🔴 Immediate | Unblocked as of 2026-09-10 (live app now reachable) — not yet done |
 | Bones review — ORDER 008 Marketplace | 🔴 Immediate | Unblocked as of 2026-09-10 — not yet done |
 | ORDER 009a spec session (Node & Cell Formation) | 🔴 Immediate | Not yet spec'd — needs dedicated bridge session |
-| **ORDER 011 §4.2 rollout step 4** — set `POSTGRES_URL_APP` on Preview | 🔴 Immediate (the one gated checkpoint) | **Awaiting Captain.** Sensitive value required; confirmation to Spock first per the approval. O'Brien ready |
-| **api-typecheck gap** — `tsc -p api/tsconfig.json` checks no files at all without `--ignoreDeprecations` | 🔴 Immediate | Confirmed by canary 2026-09-19. Needs a real `npm run typecheck` gate — flagged to Scotty |
+| ~~**ORDER 011 §4.2 rollout step 4** — set `POSTGRES_URL_APP` on Preview~~ | ✅ Resolved 2026-09-20 | Preview var set 2026-09-19, Production var set 2026-09-20; both redeployed and gate-verified (exit 0). Step 6 complete, §4.2 closed |
+| **api-typecheck gap** — `tsc -p api/tsconfig.json` checks no files at all without `--ignoreDeprecations` | 🔴 Immediate | Confirmed by canary 2026-09-19. Needs a real `npm run typecheck` gate — flagged to Scotty. **Evidence added 2026-09-20:** with `--ignoreDeprecations 6.0` it *does* check `api/` — 28 errors, all `TS6059` rootDir config noise, **zero real errors**, so the fix is a tsconfig change rather than a code cleanup |
+| **ORDER 012 (to be issued)** — `GET /api/marketplace/offerings` returns 500 on Production: a malformed Drizzle join in `api/marketplace/[...path].ts` (empty `sql\`\`` join condition, so the generated SQL has a stray `on` before `where`; Postgres 42601). Pre-existing and unrelated to ORDER 011 — it fails identically on the privileged owner connection. Now the **only** 5xx anywhere in the probed route set | 🔴 Immediate | Draft filed: [`CREW_ORDERS/CREW-ORDER-012-DRAFT-marketplace-browse-500.md`](CREW_ORDERS/CREW-ORDER-012-DRAFT-marketplace-browse-500.md:1) — needs Spock to formally issue |
 | Wire in BottomNav | ✅ Resolved 2026-09-10 | Shipped (standup 2026-09-10) |
 | Assign Captain's test user a real `cellId` | 🟡 Quick | Not done — needed to see a populated Trade Exchange feed |
 | AT sender-ID registration (real SMS, not `OTP_DEBUG_LOG`) | 🟡 Should start now, long lead time | Not started — Captain action, SA mobile network lead time is days–weeks |
@@ -109,14 +110,14 @@ Prototype (McCoy): `design/prototype-v1/ui_kits/resilientsa-app/index.html`
 
 | ID | Severity | Finding | Where |
 |---|---|---|---|
-| **CRIT-001** | Critical | RLS enabled but **not enforced** since 2026-07-02 — the app connects as `neondb_owner`, which carries `BYPASSRLS`. Closes only when ORDER 011 §4.2 rollout reaches step 6 and the live gate passes. | [`WORF_ALERTS/2026-09-11-order009a-role-escalation-review.md`](WORF_ALERTS/2026-09-11-order009a-role-escalation-review.md:1) §3 |
+| **CRIT-001** | ~~Critical~~ **CLOSED 2026-09-20** | RLS was enabled but **not enforced** from 2026-07-02 — the app connected as `neondb_owner`, which carries `BYPASSRLS`. **CLOSED:** the app now connects as `resilientsa_app` (superuser=false, **bypassrls=false**) and the live gate passed against Production twice — real context = 10 users visible, fabricated context = 0, no context = 0 without raising. **Residual, deliberately not ticked away:** `coop_pii` is still empty pre-pilot, so enforcement *on its rows* is not yet demonstrable with data. | [`WORF_ALERTS/2026-09-11-order009a-role-escalation-review.md`](WORF_ALERTS/2026-09-11-order009a-role-escalation-review.md:1) §3; [`scripts/verify-rls-live.ts`](resilientsa-app/scripts/verify-rls-live.ts:1) |
 | **CRIT-002** | Critical | `POST /api/auth/request-code` returned Drizzle's `err.message` — SQL **plus bound parameters**, one being the plaintext OTP — to an **unauthenticated** caller. **FIXED, deployed, live-verified A/B** on 2026-09-15. | [`WORF_ALERTS/2026-09-15-live-incident-order011-section42-app-role-breakage.md`](WORF_ALERTS/2026-09-15-live-incident-order011-section42-app-role-breakage.md:1) §3.5 |
 | **CRIT-003** | Critical | §4.2's original rollout made the application completely non-functional, **login included**. Superseded by the approved split-identity redesign. | same alert, and [`ENGINEERING_ESCALATIONS/2026-09-15-order011-section42-app-role-unviable.md`](ENGINEERING_ESCALATIONS/2026-09-15-order011-section42-app-role-unviable.md:1) |
 | **CRIT-004** | Critical | The app resolves `POSTGRES_URL`, not `DATABASE_URL` — misdocumented from the project's start, and the direct cause of the 2026-09-14 confusion. **Doctrine corrected by Spock**, commit `58c1884`. | `AGENTS.md` Rule #2 |
 | **HIGH-005/006** | High | Policies raised `42704` instead of filtering when context was absent; 5 further tables had RLS with **no policy** (deny-all). **Both remediated**: A1 made 20 policies NULL-tolerant, A2 gave the 5 tables real policies (zero-policy tables 5 → 0). | ORDER 011 §4.2 steps 1–2 |
 | **MED-007** | Medium | Two client routes are unroutable by construction, so the Trade Exchange feed can never show real listings and the grounder lookups cannot be live-tested. Needs its own order. | ORDER 010 §5 rule 2 |
 
-***Not*** accepted risk: **CRIT-001**. It is an open Critical finding, not a tolerated one.
+***Not*** accepted risk: **CRIT-001**. It was never a tolerated finding, and as of 2026-09-20 it is **closed** — evidence in the row above, with the one caveat that remains open (`coop_pii` rows) stated rather than absorbed.
 
 ---
 
