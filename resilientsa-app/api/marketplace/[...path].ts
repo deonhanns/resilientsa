@@ -30,7 +30,7 @@ import { grounders } from '../../src/db/schema/public/grounders'
 import { offeringEndorsements } from '../../src/db/schema/public/offering-endorsements'
 import { offeringEngagements } from '../../src/db/schema/public/offering-engagements'
 import { nodes } from '../../src/db/schema/public/nodes'
-import { eq, and, desc, count, sql } from 'drizzle-orm'
+import { eq, and, desc, count, inArray, sql } from 'drizzle-orm'
 
 type Seg = string
 function segments(req: VercelRequest): Seg[] {
@@ -91,17 +91,25 @@ async function offeringsRoot(req: VercelRequest, res: VercelResponse, session: {
       const endorsementCounts: Record<string, { recommend: number; total: number }> = {}
 
       if (offeringIds.length > 0) {
+        // CREW-ORDER-012: this was a raw-SQL join whose predicate was written into the
+        // TABLE argument with an EMPTY sql`` template as the join condition. Drizzle then
+        // emitted `... inner join offering_engagements oe ON ... on  where ...` — a stray
+        // `on` immediately before `where` — and Postgres rejected the statement outright.
+        // Because the enclosing `if (offeringIds.length > 0)` guard meant the query only ran
+        // once real offerings existed, every build and demo against an empty database looked
+        // correct. Rewritten as a typed Drizzle join per the order, which also removes the
+        // raw `oe.` alias references from both the select list and the WHERE.
         const engagementEndorsements = await tx
           .select({
-            offeringId: sql<string>`oe.offering_id`,
+            offeringId: offeringEngagements.offeringId,
             recommend: offeringEndorsements.recommend,
           })
           .from(offeringEndorsements)
           .innerJoin(
-            sql`offering_engagements oe ON ${offeringEndorsements.engagementId} = oe.id`,
-            sql``
+            offeringEngagements,
+            eq(offeringEndorsements.engagementId, offeringEngagements.id)
           )
-          .where(sql`oe.offering_id = ANY(${offeringIds})`)
+          .where(inArray(offeringEngagements.offeringId, offeringIds))
 
         for (const row of engagementEndorsements) {
           if (!endorsementCounts[row.offeringId]) {
