@@ -1179,6 +1179,60 @@ All corrected, with the Worf Mediums from the 009a review (MED-002/003/004/005, 
 
 ---
 
+### 2026-09-20 (cont. 2) — Captain's two follow-ups: the "Match a member" button (answered), and option (a) tested and **REFUTED**. The decision is now back with Captain/Spock.
+
+**1. Does `ListingCard`'s steward-gated "Match a member" button call any `/api/matches` endpoint? No — it calls nothing at all.**
+
+- [`ListingCard.tsx:137-152`](resilientsa-app/src/components/trade-exchange/ListingCard.tsx:137) renders the button only when `steward` is true, and wires `onClick={onMatch}` — a **prop**.
+- Its only render site, [`TradeExchange.tsx:170`](resilientsa-app/src/components/trade-exchange/TradeExchange.tsx:170), passes `onMatch={() => {}}` — **an empty function**.
+
+So violations 3–6 are **not** the Trade Exchange's matching workflow. There is no `/api/matches` caller anywhere in `src/`; those routes are declared server-side surface with no client. Dead on both ends.
+
+**What TradeExchange actually calls:**
+
+| Call | Line | Endpoint | Status |
+|---|---|---|---|
+| `api.get('/me')` | 59 | `/api/me` | routes ✓ |
+| `api.get('/listings?cell_id=…')` | 42 | `/api/listings` | **violation 1 — the browse feed** |
+| `api.post('/listings', payload)` | 80 | `/api/listings` | **violation 2 — posting** |
+| `addToOutbox('/listings','POST',…)` | 85 | offline fallback against the same broken path | inherits the defect |
+| `onMatch={() => {}}` | 170 | *nothing* | **no call** |
+
+**⚠ A second defect found while answering this — recorded, not fixed (§8 still in force).** The button is a rendered, steward-only control with a border and a label, and clicking it does nothing, silently. That is worse than a broken call, because a broken call fails visibly. It is exactly the class Bones' first-encounter test exists to catch ("would a stretched Cell Steward trust it?"), and it appears in no order and in no `BONES_VERDICT.md` entry. It needs its own line item; I am flagging it rather than absorbing it into this order.
+
+**2. Option (a) — the optional catch-all — tested on a dedicated prefix, and it does NOT work.**
+
+Branch `order-013-optional-catchall-probe` (`780a4d2`), one file `api/probe/[[...path]].ts` on a throwaway `probe` prefix so the test could not disturb any real route. Preview `resilientsa-l9o69v3u7`, Ready.
+
+| Request | Depth | Result |
+|---|---|---|
+| `GET /api/probe` | 0 | **404** (platform HTML) |
+| `GET /api/probe/` | 0 | **404** |
+| `GET /api/probe/a` | 1 | **200 — matched** |
+| `GET /api/probe/a/b` | 2 | **404** |
+| `GET /api/probe/a/b/c` | 3 | **404** |
+| `GET /api/probe/a/b/c/d` | 4 | **404** |
+
+**`[[...path]]` behaves exactly like `[...path]`: one segment only, never depth 0.** It is not treated as an optional catch-all by this project's router; the doubled brackets buy nothing. Option (a) is off the table.
+
+**The 200 at depth 1 is what makes this conclusive rather than ambiguous** — it proves the file *was* compiled and reachable, so the 404s at depths 0 and 2+ are genuine matcher refusals, not "the function was never built".
+
+**An unexpected detail worth recording next to Pattern 006:** the segment arrived as a query parameter named **`'[...path]'`** — `url: "/api/probe/a?%5B...path%5D=a"`, `queryKeys: ["[...path]"]`, while my handler read nothing (`depth: 0`, `segments: []`). That is a *third* naming variant on this deployment, distinct from `path` and from the `'...path'` Pattern 006 documents. The router appears to strip only the outer bracket pair and use the remainder as the parameter's name. It is one more reason not to build on catch-alls: here even the parameter's identity is a property of the filename, interpreted literally.
+
+**Consequence: the function-count problem is unchanged from the audit.** 11 today; a correct per-depth fix still costs 16; still four over the Hobby limit of 12. Milestone 2's answer stands as reported.
+
+**The decision, framed.** The Captain named this as ship-two-vs-Pro; I am reframing slightly, because the audit changed the input — with 12 routes known, and violations 3–6 now confirmed dead, "ship two" buys very little:
+
+- **Option (b) — Vercel Pro.** 16 files fit; the fix is a plain per-depth file split per domain with the steward-style internal dispatch inside each file. No matcher cleverness, no new assumptions. **This is the lowest-engineering-risk option**, because it relies only on what ORDER 010 already proved. It is a plan/cost decision, and therefore Captain's.
+- **Option (c) — stay on Hobby, reduce distinct depths.** Get from 16 to ≤12 by collapsing depth-3 routes to depth-2 (move the verb into the body: `offerings/:id/request`, `engagements/:id/endorse`, and similarly for matches). **Cost:** a client + API contract change touching `src/lib/api.ts` and its callers. **Risk:** more moving parts and changed endpoint shapes, but no plan change and no cost. The depth-0 routes (`/api/listings`, `/api/matches`) are irreducible — they need `index.ts` whatever else happens.
+- **Ship the two known only:** I would argue against it. Two of twelve, leaving the entire `/api/matches` set and four marketplace operations dead, and leaving §4's door open — which is the specific outcome this order exists to prevent.
+
+**One avenue I have NOT tested, offered rather than assumed:** `vercel.json`'s `rewrites` can map a multi-segment wildcard (e.g. `/api/listings/:rest*`) onto a single function, which could keep one function per domain without any catch-all. Plausible and cheap to test on the same probe branch (~two minutes). But it is a fourth option nobody asked for, and testing it unbidden would be inventing scope — so it is offered, not done.
+
+**State:** `main` untouched at `8e144a4`; Production untouched; probe branch left in place as the evidence and disposable once the decision lands. Nothing about Part B is affected by any of this.
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*
