@@ -1124,6 +1124,61 @@ All corrected, with the Worf Mediums from the 009a review (MED-002/003/004/005, 
 
 ---
 
+### 2026-09-20 (cont.) — ORDER 013 §2 AUDIT: **12 unreachable routes, not 2.** STOPPED for a sequencing decision, per §8.
+
+**Order read in full** (`CREW_ORDERS/CREW-ORDER-013.md`), after pulling — it arrived on the remote. §2 requires the complete violation list to be reported *before* anything is fixed, including the two already known. That is what follows.
+
+**Method — measured, not derived from comments.** Every catch-all was enumerated, its internal dispatch read, and then **every candidate path probed live against Production** using `smoke-routes.ts`'s own discriminator (a routed handler always returns JSON, even its own 404; a platform 404 returns HTML, because the function is never invoked). Non-destructive by construction: GETs, and non-GETs sent **unauthenticated** — the 2026-09-19 gate established those handlers return 401 before any write. `/api/auth/request-code` was probed with GET, never POST, so no SMS was sent. A negative control (`/api/definitely-not-a-route`) correctly came back NOTROUTED, so the harness is not manufacturing false positives.
+
+**FULL VIOLATION LIST — 12 routes.**
+
+| # | Route | Segs | Owning file | Known? |
+|---|---|---|---|---|
+| 1 | `GET /api/listings` | 0 | `listings/[...path].ts` | known (§1) |
+| 2 | `POST /api/listings` | 0 | `listings/[...path].ts` | known (§1) |
+| 3 | `GET /api/matches` | 0 | `matches/[...path].ts` | **new** |
+| 4 | `POST /api/matches` | 0 | `matches/[...path].ts` | **new** |
+| 5 | `PATCH /api/matches/:id/confirm` | 2 | `matches/[...path].ts` | **new** |
+| 6 | `PATCH /api/matches/:id/decline` | 2 | `matches/[...path].ts` | **new** |
+| 7 | `GET /api/marketplace/offerings/mine` | 2 | `marketplace/[...path].ts` | known (§1) |
+| 8 | `PATCH /api/marketplace/offerings/:id` | 2 | `marketplace/[...path].ts` | **new** |
+| 9 | `POST /api/marketplace/offerings/:id/request` | 3 | `marketplace/[...path].ts` | **new** |
+| 10 | `PATCH /api/marketplace/engagements/:id` | 2 | `marketplace/[...path].ts` | **new** |
+| 11 | `POST /api/marketplace/engagements/:id/endorse` | 3 | `marketplace/[...path].ts` | **new** |
+| 12 | `POST /api/steward/log-offline-trade` | 1 | *(nothing — see below)* | **new** |
+
+**Known: 2. Additional: 10.** That is not "a small, containable number", so §8 applies: **stopped before fixing anything, including the two known instances.** No code has been changed in this session.
+
+**⚠ Violation 12 is a shape nobody had identified — including the fix that ORDER 010 praised as the model.** `api/steward/[op]/[cellId].ts` consolidates the steward reads as two dynamic segments. Two dynamic segments require **exactly** two segments in the request. The client posts to `/steward/log-offline-trade` — **one** segment (`src/lib/api.ts:63`) — so nothing serves it, and the steward's *offline trade logging*, the piece built for exactly the situation where the network is down, has never been reachable. The consolidation pattern is right; this is its blind spot: **a one-segment route cannot live in a two-segment file**, and the pattern's own success is why nobody checked.
+
+**Confirmed clean** (all routed, 401/405 from the handler): the seven `/api/admin/*` routes, both `/api/auth/*` (handler's own 405), `/api/me`, `/api/gifts-profile/me`, `/api/trade-completions/:id/confirm-fairness`, and the four two-segment `/api/steward/*` reads.
+
+**Why twelve routes hid behind a green gate.** `smoke-routes.ts`'s `ROUTES` list — the very thing ORDER 010 built to catch this class — asserts `/api/listings/open` and carries an explicit comment that the bare `/api/listings` "is legitimately a platform 404 and **must not be asserted**". Every word of that is true, and it is also the trap: the list was written from the routes that **worked**, so it could never see the routes that never had. `verify-rls-live.ts` imports that same list, so the ORDER 011 gate inherited the blind spot and reported PASS over a route set that was missing twelve real routes. That is the door §4 exists to close.
+
+**FUNCTION-COUNT MATH (milestone 2) — this is the blocker, and it is architectural.**
+
+- Today: **11 route functions** against the Hobby limit of **12**. (`_lib/*` files are not functions; `api/_lib/declarations.d.ts` is not compiled.)
+- A correct fix needs **one file per distinct depth per domain**, because a file's path fixes its segment count — no amount of internal dispatch changes that:
+  - **listings** — depths {0, 1} → `index.ts` + `[id].ts` = 2 files, replacing 1 → **+1**
+  - **matches** — depths {0, 2} → `index.ts` + `[id]/[op].ts` = 2 files, replacing 1 → **+1**
+  - **marketplace** — depths {1, 2, 3} → `[op].ts` + `[op]/[id].ts` + `[op]/[id]/[action].ts` = 3 files, replacing 1 → **+2**
+  - **steward** — needs depth 1 → `[op].ts` = 1 file → **+1** (or **+0**, if the client moves to a two-segment path, which changes the API contract)
+- **Total: 16 functions — four over the limit.** Note this figure already applies the steward-style consolidation everywhere; it is the *minimum* for a correct fix, not a naive one. There is no cleverer arrangement that stays inside 12 while honouring the depth rule.
+
+**Options — a decision, not something I should settle alone (§8, and §3's instruction to flag the plan question to Captain):**
+
+- **(a) Optional catch-all `[[...path]].ts`.** If Vercel honours it on this project, one file per domain covers *every* depth: 4 files, net **−3**, about 8 functions — comfortable. **Unverified here, and ORDER 010's entire lesson is that this matcher's behaviour is exactly what cannot be assumed** (Pattern 006 shows even the parameter name is non-standard). It is cheap to settle properly: one branch, one Preview deploy, probe depth 0/1/2/3. I have **not** run it — §8 said stop, and it needs a deployment.
+- **(b) Vercel Pro.** 16 files fit without contortion. A plan/cost decision, Captain's.
+- **(c) Ship the known two now, sequence the rest.** Least work, but leaves ten routes dead and explicitly does *not* close the door §4 asks about.
+
+**Evidence, flagged as evidence and not as proof:** a search of `src/` for `/matches` finds **no caller** — only schema imports. So violations 3–6 look like dead client surface rather than a broken feature, which changes their priority but not their status. A dynamically-constructed path could evade that search, so I am not calling it settled.
+
+**Part B (nav + role gate) is unaffected by any of this** and can ship independently, on your word, once Part A's direction is set.
+
+**State:** no code changed; no database touched; Production untouched. The audit harness was temporary and has been deleted — its probe list is preserved verbatim in the table above so it can be re-created exactly.
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*
