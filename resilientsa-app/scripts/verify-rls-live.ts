@@ -81,16 +81,16 @@ const INCONCLUSIVE = 2
  * reported as STALE — remove it, because a stale exemption would silently mask a future
  * regression on that route.
  */
-const KNOWN_DEFECTS: Array<{ method: string; path: string; issue: string; reason: string }> = [
-  {
-    method: 'GET',
-    path: '/api/marketplace/offerings',
-    issue: 'CREW_ORDERS/CREW-ORDER-012-DRAFT-marketplace-browse-500.md',
-    reason:
-      'pre-existing malformed Drizzle query (Postgres 42601, stray "on" before "where"); ' +
-      'fails identically on the privileged owner connection — proven 2026-09-19, unrelated to Part B',
-  },
-]
+// EMPTY as of 2026-09-20, and that emptiness is the point — CREW-ORDER-012 §5 made removing
+// the last entry the order's own closing proof.
+//
+// The sequence, for the record: the entry was created for GET /api/marketplace/offerings
+// (ORDER-012's malformed Drizzle join). Once that route was fixed and deployed, this script
+// reported it as a STALE EXEMPTION — exit 0, with the route named as no-longer-failing —
+// which is the self-retiring mechanism doing its job rather than my asserting the fix. The
+// entry was then removed and the gate re-run clean. Leaving it in place would have let a
+// future regression on this same route hide exactly the way the original bug did.
+const KNOWN_DEFECTS: Array<{ method: string; path: string; issue: string; reason: string }> = []
 
 function banner(n: string, s: string) {
   console.log(`\n${'─'.repeat(78)}\n  ${n}  ${s}\n${'─'.repeat(78)}`)

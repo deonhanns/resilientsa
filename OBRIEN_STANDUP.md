@@ -1060,6 +1060,70 @@ Worth contrasting with the same gate on 2026-09-19 (cont.3), where it returned *
 
 ---
 
+### 2026-09-20 — ORDER 012 COMPLETE: the Marketplace browse route works for the first time. Plus a full MISSION_STATUS ground-truth refresh.
+
+**Order read in full** (`CREW-ORDERS/CREW-ORDER-012.md`), which arrived on the remote — my local `main` was behind, so the first thing I did was pull rather than assume the file was missing. Diagnosis taken as given; §3's fix approach specified, so it was applied as specified rather than re-litigated.
+
+**Reproduced first, because §4 says a green build proves nothing.** Authenticated against Production, before touching code: `GET /api/marketplace/offerings` → **500**, and **500** for `?pillar=water` and `?search=a` too.
+
+**And I checked §2's `42601` claim rather than repeating it.** The order states the error is Postgres 42601; I had not personally confirmed that, only the malformed SQL. Drizzle wraps the driver error, so the cause had to be read explicitly:
+
+```
+emitted:  ... inner join offering_engagements oe ON "offering_endorsements"."engagement_id" = oe.id on  where ...
+cause code: 42601
+cause message: syntax error at or near "on"
+```
+
+So the stray `on` immediately before `where` is exactly as documented, and the SQLSTATE is now **verified**, not inherited.
+
+**Data precondition (this is the part that made the whole thing verify after 24 hours of proving nothing).** `programme_offerings`: **5 active** rows. `grounders`: 1, verified. `offering_engagements`: 1. `offering_endorsements`: 0. Five rows is enough — the malformed join is only reached when `offeringIds.length > 0`, which is why it hid while the table was empty and why the live gate finally surfaced it.
+
+**The fix, exactly as specified** — a typed Drizzle join, not a second raw-SQL shape:
+
+```ts
+.innerJoin(offeringEngagements, eq(offeringEndorsements.engagementId, offeringEngagements.id))
+```
+
+The raw `oe.` alias references in the select list and the `WHERE` had to move to typed columns with it (`offeringEngagements.offeringId`, `inArray(...)`) — that is a consequence of the join change, not scope creep. Diff was two hunks; `npm run build` exit 0, zero errors.
+
+**Verified live on Production** (deploy `resilientsa-h23jenmqm`, Ready 44s) — status *and* payload, because a 200 with an empty or wrong body would have been a false pass:
+
+| probe | result |
+|---|---|
+| `/offerings` | **200**, 5 offerings |
+| `/offerings?pillar=water` | 200, 5 |
+| `/offerings?pillar=nonsense` | 200, **0** — real negative case |
+| `/offerings?search=water` | 200, 5 |
+| `/offerings?search=zzzzzz` | 200, **0** — real negative case |
+
+Payload carries all nine fields ORDER-008 §6.1.1 specifies (`id, name, shortDescription, pillarTags, providerName, providerVerified, endorsementCount, totalEndorsements, status`), the returned set matches the database's expected set row for row, and the invariant **"every returned row is active with a verified provider" HOLDS**.
+
+**§3's secondary check — the filtering is correct, and here is the honest limit of that claim.** The code's conditions map condition-for-condition onto §6.1.1's `WHERE` (`po.status = 'active' AND g.verification_status = 'verified'` plus pillar/search); a predicate matrix over the full 2×2 (active/verified, active/unverified, paused/verified, archived/verified, draft/verified) admits **only** `active + verified`; and the live invariant above holds.
+
+**What I could not test: the endpoint's *exclusion* path.** There are **zero** non-active offerings and **zero** offerings from unverified grounders in the database, so there is nothing for the filter to exclude. I am not reporting that as verified. It would become testable with one `paused` row, or one offering under an unverified grounder — that is a data decision, not a bug fix, so I did not manufacture it. This is the same shape of gap that let this bug hide: **a filter that has never had anything to reject is a filter nobody has tested.**
+
+Also noted, **deliberately not changed**: the endpoint applies `limit(50)`, which §6.1.1 does not specify. That is a product question, not this bug, and §7 said to stop rather than change browse semantics — so it is recorded in `MISSION_STATUS.md` as an open product note.
+
+**Milestone 4 — the exemption, and the gate proving its own fix.** I did this in the order that makes the mechanism do the work, rather than asserting the outcome:
+
+1. With the `KNOWN_DEFECTS` entry **still present**, and the fix deployed: gate **exit 0**, and it reported a **⚠ STALE EXEMPTION** naming `GET /api/marketplace/offerings`. That is the self-retiring mechanism detecting, by itself, that the route no longer fails — the order's closing proof, produced by the code rather than claimed by me.
+2. Then the entry was removed (registry now empty, with a comment recording why and how it emptied), and the gate re-run: **exit 0**, no `KNOWN`, no `STALE`, and the route's own line reads **`ok 200 ... auth`**. Nothing is exempt any more, so a future regression on that route cannot hide behind a leftover entry.
+
+**Also done, as a separate ask: `MISSION_STATUS.md` fully refreshed rather than patched.** It was carrying several false statements, not just the 009a one:
+
+- It still said **ORDER 009a was "not yet spec'd"**, ten days after it shipped — the spec session it was waiting for had already happened.
+- It said the **Bones reviews were "not yet done"**. They are not: `BONES_VERDICT.md` holds ORDER 007 (upgraded to `CONDITIONAL PASS` on live re-review), ORDER 008 (`CONDITIONAL PASS`, still lacking a live look with data — *now finally possible*), and ORDER 009a (`NEEDS REVISION`; its CRITICAL BN-LIVE-06 was ORDER 010's routing bug and is fixed).
+- It claimed `/trade`, `/support` and `/steward` had **no UI to move between them**, while another line on the same page recorded `BottomNav` as shipped. Bones' live pass confirms the nav renders those three; the actual gap is `/admin`.
+- Its **build-sequence table had no row for 009a or 012**, and its NEXT list still opened with "ORDER 011 §4.2 step 4 — Captain supplies `POSTGRES_URL_APP`", which had been done.
+
+All corrected, with the Worf Mediums from the 009a review (MED-002/003/004/005, LOW-006/007) added as **open and unowned** rather than left invisible, and the fourth verification-integrity finding — *a green check against an empty table is not a green check* — written in, because it will apply again.
+
+**Housekeeping:** the temp probe (`scripts/_probe-marketplace.ts`) and the session token file were deleted before the commit; the committed diff contains only `api/marketplace/[...path].ts`, `scripts/verify-rls-live.ts` and documentation. `npm run build` exit 0.
+
+**Honest summary of where ORDER 012 stands:** all six milestones met. The one thing *not* proven is the exclusion path, for lack of any data to exclude — stated, not glossed.
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*
