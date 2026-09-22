@@ -84,6 +84,7 @@ Prototype (McCoy): `design/prototype-v1/ui_kits/resilientsa-app/index.html`
 
 | Item | Priority | Status |
 |---|---|---|
+| **Dead "Match a member" control (`BN-LIVE-07`)** — a steward-only button that silently does nothing: its `onClick` is a prop and the only caller passes `() => {}`. Whether it needs wiring or removal is undecided (draft §3). **Recorded, not fixed.** | 🔴 Immediate (Bones-relevant) | Draft filed: [`CREW_ORDERS/CREW-ORDER-DRAFT-inert-match-member-button.md`](CREW_ORDERS/CREW-ORDER-DRAFT-inert-match-member-button.md:1); logged as `BN-LIVE-07` in [`BONES_VERDICT.md`](BONES_VERDICT.md:1). Needs Spock to issue + a product decision |
 | **ORDER 008 Marketplace — live Bones look, with data** | 🔴 Immediate | `CONDITIONAL PASS` was given without a working data path, and Bones' own live pass said the browse *"cannot have been judged against one by any reviewer at any point."* A path now exists (5 real offerings, correct payload, verified 2026-09-20). This is finally doable |
 | **ORDER 009a NodeAdmin — Bones re-review** | 🔴 Immediate | `NEEDS REVISION`; the CRITICAL BN-LIVE-06 was ORDER 010's routing bug (fixed) — re-check the nav/`/admin` gap and re-issue |
 | **ORDER 007 StewardDashboard — Bones** | 🟡 Conditions | Verdict on file: `CONDITIONAL PASS` (upgraded from `NEEDS REVISION` on live re-review). Outstanding conditions to close, not a fresh review |

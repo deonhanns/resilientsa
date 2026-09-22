@@ -348,3 +348,24 @@ The live text supports the intended tone: warm isolate copy, plain-language acti
 5. **Human visual pass** — typography, spacing, hierarchy, dignity.
 
 **Bones sign-off: PARTIAL LIVE PASS — ORDER 007 CONDITIONAL PASS (upgraded from NEEDS REVISION); ORDER 009a NEEDS REVISION. Not a substitute for human eyes; authenticated states and both admin consoles remain unseen.**
+
+---
+
+### BN-LIVE-07 — a steward-only control that does nothing, silently
+
+**Addendum — O'Brien, 2026-09-20. Recorded by O'Brien, not Bones, and deliberately *not* a verdict — it is a finding awaiting one, in the same spirit as the 2026-09-19 Marketplace addendum above.**
+
+`ListingCard` renders a steward-gated button labelled **"👥 Match a member"** whose `onClick` is the `onMatch` **prop** — [`ListingCard.tsx:140`](resilientsa-app/src/components/trade-exchange/ListingCard.tsx:140) — and whose only render site passes `onMatch={() => {}}`, **an empty function** — [`TradeExchange.tsx:170`](resilientsa-app/src/components/trade-exchange/TradeExchange.tsx:170). It is a no-op by construction: not a handler that fails, no handler at all.
+
+A broken call fails **visibly**. This fails silently: a Cell Steward taps "Match a member", nothing happens, and nothing distinguishes *"the system is broken"* from *"I did it wrong"* from *"that's normal"*. That is question 3 failing (*reduces anxiety*) and question 4 failing (*would a stretched Cell Steward trust it on first use*) — and it fails them in the exact way this mission's brief warns about, because a control that looks like a working tool but is not is closer to development theatre than to a tool.
+
+It was found by reading source, not during a live pass, so this control has never had a Bones visual review. Treat this entry as a flag for the human eyes that are already owed per BN-LIVE-03/04 — not as a judgement already made.
+
+**What is undecided, and it is a product question rather than an engineering one:** nobody knows what the button was meant to do. Two readings, two different orders —
+
+- **It is unfinished wiring.** The four `/api/matches` routes exist server-side and have **no client caller anywhere in `src/`**. If this button was their intended caller, the real work is a steward-facing match flow — a feature, not a fix.
+- **It is leftover UI.** If the matching flow was descoped or re-planned, the honest fix is to remove the control.
+
+Filed for its own order — deliberately unnumbered, since numbering is Spock's and MED-007 is also awaiting one: [`CREW_ORDERS/CREW-ORDER-DRAFT-inert-match-member-button.md`](CREW_ORDERS/CREW-ORDER-DRAFT-inert-match-member-button.md:1).
+
+**Cross-reference for whoever picks up CREW-ORDER-013:** those same four `/api/matches` routes are four of that order's twelve unreachable routes, *and* they are callerless. Those two facts together are why deferring the Matches domain to its own order is defensible rather than a dodge — and why fixing them in isolation would still leave them dead.

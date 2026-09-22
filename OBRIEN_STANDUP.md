@@ -1233,6 +1233,51 @@ Branch `order-013-optional-catchall-probe` (`780a4d2`), one file `api/probe/[[..
 
 ---
 
+### 2026-09-20 (cont. 3) — Function-count math recomputed for the 8 client-called routes; the dead button given a home in the record
+
+**Scope as directed:** the 8 violations with a real client caller — listings ×2, marketplace ×5, steward ×1. The Matches domain (violations 3–6) deferred to its own future order.
+
+**Answer as asked: NO — it does not fit under 12. And the shortfall is larger than the scope reduction saves.**
+
+| Domain | Preserve every currently-routing path | Serve only what callers need |
+|---|---|---|
+| listings | depths {0,1} → 2 files, replacing 1 → **+1** | depth {0} → 1 file, replacing 1 → **0** |
+| marketplace | depths {1,2,3} → 3 files, replacing 1 → **+2** | *same* → **+2** |
+| steward | depths {1,2} → add 1 → **+1** | *same* → **+1** |
+| matches | deferred, untouched → **0** | **0** |
+| **TOTAL** | **11 + 4 = 15 — three over** | **11 + 3 = 14 — two over** |
+
+**The one real lever the scoping exposed, and it is a genuine finding.** I checked whether the listings domain needs its depth-1 routes at all, rather than assuming it did: **no caller exists for any `/api/listings/<id>`.** The only listings calls anywhere in `src/` are the bare `GET /listings?cell_id=…` and `POST /listings` — [`TradeExchange.tsx:42`](resilientsa-app/src/components/trade-exchange/TradeExchange.tsx:42) and [`:80`](resilientsa-app/src/components/trade-exchange/TradeExchange.tsx:80) — plus the outbox fallback at `:85` against the same bare path. So listings needs **depth 0 only**, and a single `index.ts` serves both client-called methods. That is where the second column's 14 comes from.
+
+**It is a scope decision, not a free win, and I want that on the record:** `/api/listings/open` and `PATCH`/`DELETE /api/listings/:id` **route correctly today**. One of them is asserted by `smoke-routes.ts` as the stand-in for the broken bare path. Dropping them is a deliberate reduction of currently-working surface, not tidying.
+
+**Would option (c)'s depth-3→depth-2 collapse alone close the gap? No.** (c) folds marketplace's two depth-3 routes into depth-2 calls by moving the verb into the body, taking marketplace from 3 files to 2 → **+1** instead of +2:
+
+- preserve-everything: 15 → **14** — still two over
+- callers-only: 14 → **13** — still one over
+
+**So (c) closes one of the three. It does not close the gap.**
+
+**For completeness, since the question was about (c) *alone* — what would actually fit under 12.** Three changes together, none of them in this order's scope:
+
+1. (c)'s collapse on marketplace — **1**
+2. consolidating `api/admin/members/[userId]/cell.ts` + `role.ts` into one `[userId]/[op].ts` — the steward pattern applied to admin, **no URL change, no client change** — **1**
+3. dropping the callerless listings depth-1 routes — **1**
+
+10 + 1 + 1 + 1 = **12 exactly, with zero headroom** — meaning the next route this product adds needs a plan upgrade anyway. That is not a recommendation; it is the ceiling stated plainly, and it is the strongest argument that **Pro (option b) is the honest answer** rather than contorting the API to land on 12 by coincidence.
+
+**The dead button now has a home, as instructed — recorded, not fixed:**
+
+- [`BONES_VERDICT.md`](BONES_VERDICT.md:350) — logged as **`BN-LIVE-07`** (next free number after 01–06), appended as a dated addendum in the file's existing "annotated, not Bones" convention, so it reads as a finding *awaiting* a visual review rather than a verdict. It is explicitly cross-referenced to the human-eyes pass already owed for BN-LIVE-03/04.
+- [`CREW_ORDERS/CREW-ORDER-DRAFT-inert-match-member-button.md`](CREW_ORDERS/CREW-ORDER-DRAFT-inert-match-member-button.md:1) — a draft for Spock to issue and number, deliberately **unnumbered** because the next number is Spock's to assign and MED-007 is also waiting.
+- [`MISSION_STATUS.md`](MISSION_STATUS.md:86) — a row in OPEN ITEMS at 🔴 Immediate, so it cannot be absorbed and lost inside a routing order.
+
+**The part of that draft that matters most, restated because it decides everything downstream:** *nobody knows what the button was meant to do.* If it was the intended caller of `/api/matches`, the real work is a steward-facing match flow — a product feature that should be spec'd, not slipped in. If the flow was descoped, the honest fix is to remove the control. That is a product question, which is why the draft stops at recording.
+
+**Still blocked, unchanged:** the decision on the 8 routes themselves.
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*
