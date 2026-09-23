@@ -1278,6 +1278,67 @@ Branch `order-013-optional-catchall-probe` (`780a4d2`), one file `api/probe/[[..
 
 ---
 
+### 2026-09-23 — The plain-file design TESTED: **it works.** One file per domain, no dynamic segments, no catch-all. **11 functions — one under the limit — and it absorbs Matches for free.**
+
+**(The session crossed midnight SAST, hence the date change.)** Tested as directed on branch `order-013-plain-file-probe` (`3e10df9`), one file `api/listings.ts`, Preview `resilientsa-bda754q5b`.
+
+| # | Request | Result |
+|---|---|---|
+| 1 | `GET /api/listings` — the old **depth-0** root case | **200** from the plain file: `browse-collection`, `queryKeys: []` |
+| 2 | `GET /api/listings?id=123` — the old **`:id`** case, via query | **200**, `id: "123"` |
+| 3 | `POST /api/listings` with a JSON body | **200**, `bodyReceived: {"type":"offer"}` |
+| 4 | `PATCH /api/listings?id=123` | **200**, `edit-one` |
+| 5 | `PATCH /api/listings` with **no** id | **400** — my dispatch branch, so dispatch is genuinely being exercised |
+| 6 | `GET /api/listings/open` and `/api/listings/123` | **401** — still the *old* catch-all's real handler |
+
+**Three results carry the weight, and one is what makes them trustworthy:**
+
+- **Depth 0 works.** This is the case no catch-all can serve — the bare `/api/listings` that has never once worked in production. A plain filename has no segment count to get wrong and no bracket syntax to mis-parse.
+- **`queryIsClean: true` on every case.** No bracket or dot mangling in `req.query`. So **none of Pattern 006's catch-all quirks apply** to a non-dynamic file — the parameter-name trouble was a property of the catch-all mechanism, not of this deployment's routing in general.
+- **Case 5 is why the rest means anything.** A stub that returns 200 for everything would have looked identical on cases 1–4. Returning the branch the code chose — including a 400 — is evidence that a real switch ran.
+- **Coexistence is confirmed (case 6).** `api/listings.ts` and `api/listings/[...path].ts` sit side by side; Vercel did not object to a file and a directory sharing a name, depth 0 goes to the file, depth 1 to the catch-all. So **the migration can be incremental rather than atomic** — add the plain file, migrate the client, verify, then delete the directory.
+
+**Authoritative function count, read off the deployment rather than inferred.** `vercel inspect` on the probe deployment lists 5 λ functions and then "**7 output items hidden**" — **12 in total**, exactly main's 11 plus the one plain file. The plain file is counted as its own function, with the catch-all still counted separately beside it. (And `find` confirms **11** route files on `main` — the two agree.)
+
+**THE MATH — 11 functions, one under the limit of 12.**
+
+| Domain | Today | Under this design |
+|---|---|---|
+| listings | `api/listings/[...path].ts` | `api/listings.ts` |
+| marketplace | `api/marketplace/[...path].ts` | `api/marketplace.ts` |
+| steward | `api/steward/[op]/[cellId].ts` | `api/steward.ts` |
+| matches | `api/matches/[...path].ts` | `api/matches.ts` *(whenever its turn comes)* |
+| everything else — 7 files | unchanged | unchanged |
+
+Each plain file **replaces** the file it supersedes one-for-one, so the count does not move: **11 — one under the limit, whether we fix the 8 caller routes or all 12 violations.** Pro is not needed, and the deferral question effectively dissolves, because fixing Matches costs nothing extra under this design. (Admin could later collapse its three files into `api/admin.ts` for 9. Not required, not in scope.)
+
+**THE API CONTRACT CHANGE, scoped honestly, because it is real and it is not free:**
+
+| Surface | Count | Detail |
+|---|---|---|
+| `src/lib/api.ts` — `marketplaceApi` | **8** URL strings | `browse`, `request`, `createOffering`, `myOfferings`, `updateOffering`, `requests`, `updateEngagement`, `endorse` |
+| `src/lib/api.ts` — `stewardApi` | **5** URL strings | the four `/<op>/${cellId}` reads, plus `log-offline-trade` |
+| Components calling paths directly | **1** | [`Marketplace.tsx:61`](resilientsa-app/src/components/marketplace/Marketplace.tsx:61) builds `/marketplace/offerings/${id}/request` itself rather than going through `api.ts` |
+| `scripts/smoke-routes.ts` `ROUTES` | the list | every marketplace/steward entry changes shape and `/api/listings/open` becomes meaningless; `verify-rls-live.ts` inherits it. This is milestone 6's work regardless |
+| **listings client** | **0** | *Nothing changes.* The client already calls `api.get('/listings?cell_id=…')` and `api.post('/listings', …)` — both depth-0 with query params. The broken domain is the one that needs no client change at all |
+| outbox | **0** | stores `/listings` POST paths only, which do not change |
+
+**Total: 13 URL strings, 1 direct component call, and the ROUTES list.** No handler *logic* changes — each existing handler body moves behind a dispatch switch in one file per domain.
+
+**Caveats stated now rather than discovered later:**
+
+1. **These are strings; TypeScript will not catch a missed one.** The extended `ROUTES` list and the gate are the only safety net, so they must land *with* this change, not after it.
+2. **It deviates from ORDER-013 §3**, which specifies "real nested dynamic-segment files… not a `[...path]` catch-all" and names the steward consolidation as the template. This satisfies the spirit — nothing depth-dependent anywhere — but it is a *third* shape. **It should have Spock's explicit blessing before being built**, not after.
+3. **Dispatch moves into code, and the URL stops being self-describing.** `/marketplace?resource=offerings&id=X` with the verb in the body means the file's switch is the single place correctness lives. The prototype proves the mechanism; the 400 branch proves dispatch is real. But each domain becomes one point of failure, and that is a genuine trade, not a pure win.
+4. **Docs drift.** ORDER 006/008/009a's route specs and `docs/technical-architecture-v1.0.md` describe path-based routes.
+5. **Proven for the mechanism, not yet built for marketplace/steward.** What is verified is: depth 0 routes, query params arrive clean, method dispatch works. The other domains are the same mechanism at depth 0 with different query shapes.
+
+**Nothing is built and nothing is merged.** `main` untouched at `bff4913`; both probe branches parked as evidence (`780a4d2`, `3e10df9`).
+
+**The decision now:** this design (a scoped, mechanical contract change across 13 strings + 1 component + the ROUTES list, landing at 11 functions with a spare slot) versus the Pro upgrade (money, 16 files, matcher-based routing, zero contract change).
+
+---
+
 *This document is owned by O'Brien.*
 *Read by Spock for mission status visibility.*
 *Referenced in `CREW_MANIFEST.md` reporting section.*
